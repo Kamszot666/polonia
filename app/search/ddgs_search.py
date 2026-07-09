@@ -28,11 +28,19 @@ except ImportError:  # starsza nazwa pakietu
 
 _PREFERRED_BACKENDS = ("html_duckduckgo", None)
 
+# Katalogi/agregatory KRS i wizytówek firmowych - potwierdzone realnie jako źródło błędnych
+# "stron WWW" (agregator zamiast oficjalnej strony podmiotu) przy uruchomieniu na pełnym
+# pliku użytkownika (372 organizacje).
 _SOCIAL_AND_DIRECTORY_DOMAINS = {
     "facebook.com", "instagram.com", "linkedin.com", "twitter.com", "x.com",
     "youtube.com", "tiktok.com", "wikipedia.org", "wikipedia.pl",
-    "ngo.pl", "rejestr.io", "aleo.com", "panoramafirm.pl", "olx.pl", "gowork.pl",
-    "cylex-polska.pl",
+    "ngo.pl", "rejestr.io", "rejestr.ngo", "aleo.com", "panoramafirm.pl", "olx.pl", "gowork.pl",
+    "cylex-polska.pl", "dnb.com", "bizraport.pl", "okredo.com", "krs-pobierz.pl",
+    "egospodarka.pl", "owg.pl", "pb.pl", "registries.io", "firmania.pl", "infoveriti.pl",
+    "imsig.pl", "pkt.pl", "krs-online.com.pl", "rejestrkrs.pl", "vrejestr.pl", "gov.pl",
+    "biaman.pl", "localgymsandfitness.com", "fanimani.pl",
+    # Artefakty samej wyszukiwarki (np. URL przekierowania) czasem przeciekają do wyników.
+    "startpage.com", "mojeek.com", "brave.com", "bing.com", "yandex.com",
 }
 
 
@@ -101,10 +109,13 @@ class DdgsOfficialSiteSearch:
         return []
 
     def _pick_best(self, organization_name: str, results: list[SearchResult]) -> SearchResult | None:
-        candidates = [r for r in results if not self._is_excluded_domain(r.url)]
+        candidates = [r for r in results if not self._is_excluded_result(r.url)]
         if not candidates:
-            # Lepszy słaby kandydat (np. profil na ngo.pl) niż całkowity brak danych.
-            candidates = results
+            # Zweryfikowane realnie: podstawianie wykluczonego wyniku (katalog firm, PDF,
+            # Wikipedia) jako "strony WWW" bywa aktywnie mylące (np. strona rejestru KRS
+            # zamiast oficjalnej strony podmiotu) - lepiej zostawić brak niż zgadywać źle.
+            logger.debug(f"Wszystkie wyniki dla {organization_name!r} to katalogi/agregatory - brak kandydata")
+            return None
 
         def score(result: SearchResult) -> float:
             title_score = fuzz.token_set_ratio(organization_name, result.title)
@@ -116,7 +127,9 @@ class DdgsOfficialSiteSearch:
         return best
 
     @staticmethod
-    def _is_excluded_domain(url: str) -> bool:
+    def _is_excluded_result(url: str) -> bool:
+        if url.lower().endswith(".pdf"):
+            return True
         extracted = tldextract.extract(url)
         registered_domain = f"{extracted.domain}.{extracted.suffix}".lower()
         return registered_domain in _SOCIAL_AND_DIRECTORY_DOMAINS
