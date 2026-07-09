@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Dane wykonawcze - checkpoint, cache stron, logi, wynik Excela
+data/
+.cache/
+
+# Modele NLP pobierane na żądanie (spaCy/GLiNER/sentence-transformers/EasyOCR)
+*.model
