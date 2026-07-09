@@ -1,0 +1,510 @@
+{
+  "odpis": {
+    "rodzaj": "Aktualny",
+    "naglowekA": {
+      "rejestr": "RejP",
+      "numerKRS": "0000130056",
+      "dataCzasOdpisu": "09.07.2026 07:53:17",
+      "stanZDnia": "07.07.2026",
+      "dataRejestracjiWKRS": "24.09.2002",
+      "numerOstatniegoWpisu": 89,
+      "dataOstatniegoWpisu": "07.07.2026",
+      "sygnaturaAktSprawyDotyczacejOstatniegoWpisu": "RDF/862983/26/870",
+      "oznaczenieSaduDokonujacegoOstatniegoWpisu": "SYSTEM",
+      "stanPozycji": 4
+    },
+    "dane": {
+      "dzial1": {
+        "danePodmiotu": {
+          "formaPrawna": "FUNDACJA",
+          "identyfikatory": {
+            "nip": "5262149912"
+          },
+          "nazwa": "FUNDACJA \"POMOC POLAKOM NA WSCHODZIE\" IM. JANA OLSZEWSKIEGO",
+          "daneOWczesniejszejRejestracji": {
+            "nazwaPoprzedniegoRejestru": "REJESTR FUNDACJI",
+            "numerWPoprzednimRejestrze": "RF 3286",
+            "sadProwadzacyRejestr": "SĄD REJONOWY DLA M.ST. WARSZAWY XVI WYDZIAŁ GOSPODARCZY"
+          },
+          "czyProwadziDzialalnoscZInnymiPodmiotami": false,
+          "czyPosiadaStatusOPP": false
+        },
+        "siedzibaIAdres": {
+          "siedziba": {
+            "kraj": "POLSKA",
+            "wojewodztwo": "MAZOWIECKIE",
+            "powiat": "M.ST. WARSZAWA",
+            "gmina": "M.ST. WARSZAWA",
+            "miejscowosc": "WARSZAWA"
+          },
+          "adres": {
+            "ulica": "JAZDÓW",
+            "nrDomu": "10A",
+            "miejscowosc": "WARSZAWA",
+            "kodPocztowy": "00-467",
+            "poczta": "WARSZAWA",
+            "kraj": "POLSKA"
+          },
+          "adresDoDoreczenElektronicznychWpisanyDoBAE": "AE:PL-23922-31748-VSVSI-26"
+        },
+        "umowaStatut": {
+          "informacjaOZawarciuZmianieUmowyStatutu": [
+            {
+              "zawarcieZmianaUmowyStatutu": "DATA SPORZĄDZENIA STATUTU: 04 STYCZEŃ 1993R."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "ZMIANA STATUTU: 30.05.2007\n- § 8 W PIERWSZYM ZDANIU;\n- § 8 PO PKT 4 DOPISUJE SIĘ PKT 5;\n- § 9 DOPISUJE SIĘ PKT 3;\n- § 10 W PKT 1;\n- § 14 W PKT 1;\n- § 16 W PKT 6;"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "06.05.2014, UCHWALENIE STATUTU W NOWYM BRZMIENIU"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "DATA ZMIANY STATUTU: 15.12.2016R., ZMIANA: §7, §8, §15 PKT 6, §18 UST.2, §18 UST.4, DODANO: §18 UST.6, §19 UST.8"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "DATA ZMIANY STATUTU: 31 STYCZNIA 2018 R.\nZMIANA: § 8 PKT. 13, § 14 UST. 2, § 14 UST. 4, § 14 UST. 11, § 15 PKT. 10, § 18 UST. 2, § 24 UST. 3, § 25 UST. 3, § 27 DODANO: § 7 PKT. 13 I 14."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "21.01.2019R., ZMIANA §14 UST.3, §14 UST.4, §14 UST.9, §18"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "16.12.2021 R., ZMIANA §24 UST. 1"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "08.07.2022 R. ZMIANA §1, §7, §8, DODANO § 11, ZMIANA NUMERACJI PARAGRAFÓW: § 11- §28 NA §12- §29 , W § 12 DODANO PKT. 6 I 7, ZMIANA § 15 UST.9, § 16, ZAŁĄCZNIKA NR 1"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "14.12.2022 R. ZMIANA §1 PKT.3-5"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "19.04.2023 R. ZMIANA §1 PKT.5, DODANO W §1 PKT.6"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "24.03.2025 R. ZMIANA § 21 UST.1"
+            }
+          ]
+        },
+        "pozostaleInformacje": {
+          "czasNaJakiUtworzonyZostalPodmiot": "NIEOZNACZONY"
+        }
+      },
+      "dzial2": {
+        "reprezentacja": {
+          "nazwaOrganu": "ZARZĄD FUNDACJI",
+          "sposobReprezentacji": "1. OŚWIADCZENIA WOLI W IMIENIU FUNDACJI, Z ZASTRZEŻENIEM UST.2, SKŁADAJĄ DWAJ CZŁONKOWIE ZARZĄDU DZIAŁAJĄCY ŁĄCZNIE, W TYM PREZES ZARZĄDU ALBO PREZES ZARZĄDU DZIAŁAJĄCY ŁĄCZNIE Z PROKURENTEM. \n2. W SPRAWACH DOTYCZĄCYCH ZATRUDNIANIA PRACOWNIKÓW ORAZ W SPRAWACH NIEZWIĄZANYCH Z ZACIĄGANIEM ZOBOWIĄZAŃ MAJĄTKOWYCH POWYŻEJ 10.000 (DZIESIĘĆ TYSIĘCY) ZŁOTYCH - OŚWIADCZENIA WOLI W IMIENIU FUNDACJI MOŻE SKŁADAĆ JEDNOOSOBOWO PREZES FUNDACJI.",
+          "sklad": [
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "F********"
+              },
+              "imiona": {
+                "imie": "M******",
+                "imieDrugie": "J**"
+              },
+              "identyfikator": {
+                "pesel": "8**********"
+              },
+              "funkcjaWOrganie": "PREZES ZARZĄDU"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "S*******",
+                "nazwiskoIICzlon": "G********"
+              },
+              "imiona": {
+                "imie": "J******",
+                "imieDrugie": "M*****"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "WICEPREZES ZARZĄDU"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "L****"
+              },
+              "imiona": {
+                "imie": "K********"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "CZŁONEK ZARZĄDU"
+            }
+          ]
+        },
+        "organNadzoru": [
+          {
+            "nazwa": "RADA FUNDACJI",
+            "sklad": [
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "K****"
+                },
+                "imiona": {
+                  "imie": "L*****",
+                  "imieDrugie": "M*********"
+                },
+                "identyfikator": {
+                  "pesel": "5**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "M******"
+                },
+                "imiona": {
+                  "imie": "J**"
+                },
+                "identyfikator": {
+                  "pesel": "5**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "W*****"
+                },
+                "imiona": {
+                  "imie": "R****",
+                  "imieDrugie": "S********"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "D***"
+                },
+                "imiona": {
+                  "imie": "A******",
+                  "imieDrugie": "M******"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "R******",
+                  "nazwiskoIICzlon": "Z********"
+                },
+                "imiona": {
+                  "imie": "J****"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "D**********"
+                },
+                "imiona": {
+                  "imie": "U******"
+                },
+                "identyfikator": {
+                  "pesel": "5**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "P*******"
+                },
+                "imiona": {
+                  "imie": "K****"
+                },
+                "identyfikator": {
+                  "pesel": "7**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "L*****"
+                },
+                "imiona": {
+                  "imie": "H*****"
+                },
+                "identyfikator": {
+                  "pesel": "5**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "Z*********"
+                },
+                "imiona": {
+                  "imie": "P****"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "T**********"
+                },
+                "imiona": {
+                  "imie": "R*****"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "S**********"
+                },
+                "imiona": {
+                  "imie": "W*******"
+                },
+                "identyfikator": {
+                  "pesel": "7**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "E********"
+                },
+                "imiona": {
+                  "imie": "A***"
+                },
+                "identyfikator": {
+                  "pesel": "7**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "U*******",
+                  "nazwiskoIICzlon": "W*********"
+                },
+                "imiona": {
+                  "imie": "A*********"
+                },
+                "identyfikator": {
+                  "pesel": "9**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "K*******"
+                },
+                "imiona": {
+                  "imie": "M*****"
+                },
+                "identyfikator": {
+                  "pesel": "5**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "J******"
+                },
+                "imiona": {
+                  "imie": "A********"
+                },
+                "identyfikator": {
+                  "pesel": "8**********"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "dzial3": {
+        "przedmiotDzialalnosci": {
+          "przedmiotPrzewazajacejDzialalnosci": [
+            {
+              "opis": "WYDAWANIE KSIĄŻEK",
+              "kodDzial": "58",
+              "kodKlasa": "11",
+              "kodPodklasa": "Z"
+            }
+          ],
+          "przedmiotPozostalejDzialalnosci": [
+            {
+              "opis": "DZIAŁALNOŚĆ FOTOGRAFICZNA",
+              "kodDzial": "74",
+              "kodKlasa": "20",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ ZWIĄZANA Z PRODUKCJĄ FILMÓW, NAGRAŃ WIDEO I PROGRAMÓW TELEWIZYJNYCH",
+              "kodDzial": "59",
+              "kodKlasa": "11",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ OBIEKTÓW KULTURALNYCH",
+              "kodDzial": "90",
+              "kodKlasa": "04",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "POZASZKOLNE FORMY EDUKACJI ARTYSTYCZNEJ",
+              "kodDzial": "85",
+              "kodKlasa": "52",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "NAUKA JEZYKÓW OBCYCH",
+              "kodDzial": "85",
+              "kodKlasa": "59",
+              "kodPodklasa": "A"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ W ZAKRESIE NAGRAŃ DŹWIĘKOWYCH I MUZYCZNYCH",
+              "kodDzial": "59",
+              "kodKlasa": "20",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "REPRODUKCJA ZAPISANYCH NOŚNIKÓW INFORMACJI",
+              "kodDzial": "18",
+              "kodKlasa": "20",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ WSPOMAGAJĄCA EDUKACJĘ",
+              "kodDzial": "85",
+              "kodKlasa": "60",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "POZOSTAŁA DZIAŁALNOŚĆ WYDAWNICZA",
+              "kodDzial": "58",
+              "kodKlasa": "19",
+              "kodPodklasa": "Z"
+            }
+          ]
+        },
+        "wzmiankiOZlozonychDokumentach": {
+          "wzmiankaOZlozeniuRocznegoSprawozdaniaFinansowego": [
+            {
+              "dataZlozenia": "11.06.2014",
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "dataZlozenia": "11.06.2014",
+              "zaOkresOdDo": "OD 01.01.2008 DO 31.12.2008"
+            },
+            {
+              "dataZlozenia": "11.06.2014",
+              "zaOkresOdDo": "OD 01.01.2009 DO 31.12.2009"
+            },
+            {
+              "dataZlozenia": "11.06.2014",
+              "zaOkresOdDo": "OD 01.01.2010 DO 31.12.2010"
+            },
+            {
+              "dataZlozenia": "11.06.2014",
+              "zaOkresOdDo": "OD 01.01.2011 DO 31.12.2011"
+            },
+            {
+              "dataZlozenia": "11.06.2014",
+              "zaOkresOdDo": "OD 01.01.2012 DO 31.12.2012"
+            },
+            {
+              "dataZlozenia": "01.04.2015",
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "dataZlozenia": "15.07.2016",
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "dataZlozenia": "28.06.2017",
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "dataZlozenia": "05.07.2018",
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "dataZlozenia": "26.06.2019",
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "dataZlozenia": "29.06.2021",
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "dataZlozenia": "14.07.2022",
+              "zaOkresOdDo": "OD 01.01.2021 DO 31.12.2021"
+            },
+            {
+              "dataZlozenia": "12.07.2023",
+              "zaOkresOdDo": "OD 01.01.2022 DO 31.12.2022"
+            },
+            {
+              "dataZlozenia": "17.07.2024",
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "dataZlozenia": "07.07.2025",
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "dataZlozenia": "07.07.2026",
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuUchwalyPostanowieniaOZatwierdzeniuRocznegoSprawozdaniaFinansowego": [
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2008 DO 31.12.2008"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2009 DO 31.12.2009"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2010 DO 31.12.2010"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2011 DO 31.12.2011"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2012 DO 31.12.2012"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2022 DO 31.12.2022"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ]
+        },
+        "informacjaODniuKonczacymRokObrotowy": {
+          "dzienKonczacyPierwszyRokObrotowy": "31.12.2008"
+        }
+      },
+      "dzial4": {},
+      "dzial5": {},
+      "dzial6": {}
+    }
+  }
+}

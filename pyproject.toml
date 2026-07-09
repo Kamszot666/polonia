@@ -1,0 +1,38 @@
+[project]
+name = "polonia-scraper"
+version = "0.1.0"
+description = "System do pozyskiwania danych kontaktowych organizacji wspierających Polonię, mających siedzibę w Polsce"
+requires-python = ">=3.14"
+dependencies = [
+    "ddgs>=9.0",
+    "httpx[http2]>=0.27",
+    "selectolax>=0.3",
+    "playwright>=1.45",
+    "regex>=2024.5.15",
+    "phonenumbers>=8.13",
+    "extruct>=0.18",
+    "diskcache>=5.6",
+    "loguru>=0.7",
+    "openpyxl>=3.1",
+    "easyocr>=1.7",
+    "spacy>=3.7",
+    "gliner>=0.2",
+    "transformers>=4.42",
+    "sentence-transformers>=3.0",
+    "rapidfuzz>=3.9",
+    "trafilatura>=1.10",
+    "email-validator>=2.2",
+    "dnspython>=2.6",
+    "tldextract>=5.1",
+    "url-normalize>=1.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
