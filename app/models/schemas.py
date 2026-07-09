@@ -16,6 +16,8 @@ class SourceType(StrEnum):
     SEARCH_RESULT = "search_result"
     PAGE_TEXT = "page_text"
     META_TAG = "meta_tag"
+    KRS_API = "krs_api"
+    MANUAL_INPUT = "manual_input"  # dane wprowadzone wcześniej ręcznie/w innym procesie, wczytane z pliku wejściowego
 
 
 class OrganizationStatus(StrEnum):
@@ -82,6 +84,12 @@ class Organization:
     social_media: FieldValue = field(default_factory=FieldValue)
     contact_person: ContactPerson = field(default_factory=ContactPerson)
     description: FieldValue = field(default_factory=FieldValue)
+    krs: FieldValue = field(default_factory=FieldValue)
+    regon: FieldValue = field(default_factory=FieldValue)
+    nip: FieldValue = field(default_factory=FieldValue)
+    category: str | None = None  # Kategoria - nie wykrywane automatycznie, przenoszone z pliku wejściowego
+    industry: FieldValue = field(default_factory=FieldValue)  # Branża / Typ
+    origin_source_url: str | None = None  # URL źródła - skąd wiadomo o istnieniu podmiotu (np. lista MSZ/Senat)
     status: OrganizationStatus = OrganizationStatus.PENDING
     error: str | None = None
     date_acquired: str | None = None  # format DD.MM.RRRR, zgodnie z procedurą budowy bazy w Excelu

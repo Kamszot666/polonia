@@ -64,9 +64,6 @@ class CheckpointStore:
         cursor = self._connection.execute("SELECT data_json FROM organizations")
         return [_organization_from_dict(json.loads(row[0])) for row in cursor.fetchall()]
 
-    def pending_names(self, all_names: list[str]) -> list[str]:
-        return [name for name in all_names if not self.is_done(name)]
-
     def close(self) -> None:
         self._connection.close()
 
@@ -101,6 +98,12 @@ def _organization_from_dict(data: dict) -> Organization:
         social_media=_field_value_from_dict(data["social_media"]),
         contact_person=contact_person,
         description=_field_value_from_dict(data["description"]),
+        krs=_field_value_from_dict(data.get("krs", {})),
+        regon=_field_value_from_dict(data.get("regon", {})),
+        nip=_field_value_from_dict(data.get("nip", {})),
+        category=data.get("category"),
+        industry=_field_value_from_dict(data.get("industry", {})),
+        origin_source_url=data.get("origin_source_url"),
         status=OrganizationStatus(data["status"]),
         error=data.get("error"),
         date_acquired=data.get("date_acquired"),

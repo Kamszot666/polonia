@@ -1,0 +1,279 @@
+{
+  "odpis": {
+    "rodzaj": "Aktualny",
+    "naglowekA": {
+      "rejestr": "RejS",
+      "numerKRS": "0000010057",
+      "dataCzasOdpisu": "09.07.2026 07:52:34",
+      "stanZDnia": "20.11.2025",
+      "dataRejestracjiWKRS": "26.04.2001",
+      "numerOstatniegoWpisu": 16,
+      "dataOstatniegoWpisu": "04.08.2025",
+      "sygnaturaAktSprawyDotyczacejOstatniegoWpisu": "LU.VI NS-REJ.KRS/21339/25/977",
+      "oznaczenieSaduDokonujacegoOstatniegoWpisu": "SĄD REJONOWY LUBLIN WSCHÓD W LUBLINIE Z SIEDZIBĄ W ŚWIDNIKU, VI WYDZIAŁ GOSPODARCZY KRAJOWEGO REJESTRU SĄDOWEGO",
+      "stanPozycji": 3
+    },
+    "dane": {
+      "dzial1": {
+        "danePodmiotu": {
+          "formaPrawna": "STOWARZYSZENIE",
+          "identyfikatory": {
+            "nip": "7120104964"
+          },
+          "nazwa": "TOWARZYSTWO NAUKOWE KATOLICKIEGO UNIWERSYTETU LUBELSKIEGO JANA PAWŁA II",
+          "daneOWczesniejszejRejestracji": {
+            "nazwaPoprzedniegoRejestru": "REJESTR STOWARZYSZEŃ",
+            "numerWPoprzednimRejestrze": "1616",
+            "sadProwadzacyRejestr": "SĄD WOJEWÓDZKI W LUBLINIE"
+          },
+          "czyPosiadaStatusOPP": false
+        },
+        "siedzibaIAdres": {
+          "siedziba": {
+            "kraj": "POLSKA",
+            "wojewodztwo": "LUBELSKIE",
+            "powiat": "LUBLIN",
+            "gmina": "LUBLIN",
+            "miejscowosc": "LUBLIN"
+          },
+          "adres": {
+            "ulica": "UL. SPOKOJNA",
+            "nrDomu": "1",
+            "nrLokalu": "408-409",
+            "miejscowosc": "LUBLIN",
+            "kodPocztowy": "20-074",
+            "poczta": "LUBLIN",
+            "kraj": "POLSKA"
+          },
+          "adresDoDoreczenElektronicznychWpisanyDoBAE": "AE:PL-15993-95917-WETIJ-13"
+        },
+        "umowaStatut": {
+          "informacjaOZawarciuZmianieUmowyStatutu": [
+            {
+              "zawarcieZmianaUmowyStatutu": "10.07.1974 R. ZMIANY W STATUCIE Z DNIA 25 LUTEGO 1998 R. (PAR.3 I 26)"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "29.03.2006 R.\nZMIENIĆ § 1"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "26.03.2019 R., ZMIENIONO § 47"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "DNIA 28.06.2021 R. DODANO W PUNKCIE I NAZWA, SIEDZIBA, CEL DO § 5 PODPUNKT \"G\""
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "26.06.2023R. W § 5 DODANO PKT H"
+            }
+          ]
+        },
+        "pozostaleInformacje": {
+          "czasNaJakiUtworzonyZostalPodmiot": "NIEOZNACZONY"
+        },
+        "komitetZalozycielski": [
+          {
+            "nazwa": "NIE DOTYCZY Z POWODU PRZEREJESTROWANIA",
+            "identyfikator": {},
+            "krs": {
+              "krs": "0000000000"
+            }
+          }
+        ],
+        "organSprawujacyNadzor": {
+          "nazwa": "PREZYDENT MIASTA LUBLINA"
+        }
+      },
+      "dzial2": {
+        "reprezentacja": {
+          "nazwaOrganu": "ZARZĄD",
+          "sposobReprezentacji": "PREZES CZUWA NAD CAŁOŚCIĄ PRAC TOWARZYSTWA ORAZ REPREZENTUJE NA ZEWNĄTRZ.WRAZ Z SEKRETARZEM GENERALNYM PODPISUJE UMOWY ORAZ WSZYSTKIE PISMA UZNANE PRZEZ SIEBIE ZA WAŻNE,ZWŁASZCZA WYCHODZĄCE NA ZEWNĄTRZ,A WRAZ ZE SKARBNIKIEM PISMA DOTYCZĄCE WYPŁAT ORAZ SPRAW FINANSOWYCH.PREZESA ZASTĘPUJE WE WSZYSTKICH CZYNNOŚCIACH WICEPREZES - PARAGRAF 31 I 32 STATUTU.",
+          "sklad": [
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "S******"
+              },
+              "imiona": {
+                "imie": "R******"
+              },
+              "identyfikator": {
+                "pesel": "5**********"
+              },
+              "funkcjaWOrganie": "PRZEWODNICZĄCY WYDZIAŁU MATEMATYCZNO-PRZYRODNICZEGO"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "K********"
+              },
+              "imiona": {
+                "imie": "C******"
+              },
+              "identyfikator": {
+                "pesel": "4**********"
+              },
+              "funkcjaWOrganie": "SKARBNIK"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "G**"
+              },
+              "imiona": {
+                "imie": "T******"
+              },
+              "identyfikator": {
+                "pesel": "5**********"
+              },
+              "funkcjaWOrganie": "PRZEWODNICZĄCY WYDZIAŁU NAUK PRAWNYCH I EKONOMICZNYCH"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "Z*****"
+              },
+              "imiona": {
+                "imie": "E**",
+                "imieDrugie": "M*********"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "SEKRETARZ GENERALNY"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "W*********"
+              },
+              "imiona": {
+                "imie": "Z*******"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "PRZEWODNICZĄCY WYDZIAŁU FILOZOFICZNEGO"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "P*******",
+                "nazwiskoIICzlon": "P*********"
+              },
+              "imiona": {
+                "imie": "U******",
+                "imieDrugie": "M*****"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "PRZEWODNICZĄCY WYDZIAŁU HISTORYCZNO-FILOLOGICZNEGO"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "K******"
+              },
+              "imiona": {
+                "imie": "P****"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "CZŁONEK ZARZĄDU"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "O*********",
+                "nazwiskoIICzlon": "K****"
+              },
+              "imiona": {
+                "imie": "M********"
+              },
+              "identyfikator": {
+                "pesel": "5**********"
+              },
+              "funkcjaWOrganie": "CZŁONEK ZARZĄDU"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "S*******"
+              },
+              "imiona": {
+                "imie": "M*****"
+              },
+              "identyfikator": {
+                "pesel": "5**********"
+              },
+              "funkcjaWOrganie": "PREZES"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "R***"
+              },
+              "imiona": {
+                "imie": "M*********"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "WICEPREZES"
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "M*****"
+              },
+              "imiona": {
+                "imie": "P****"
+              },
+              "identyfikator": {
+                "pesel": "7**********"
+              },
+              "funkcjaWOrganie": "REFERENT DS. WYDAWNICZYCH"
+            }
+          ]
+        },
+        "organNadzoru": [
+          {
+            "nazwa": "KOMISJA REWIZYJNA",
+            "sklad": [
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "B****"
+                },
+                "imiona": {
+                  "imie": "A***"
+                },
+                "identyfikator": {
+                  "pesel": "4**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "B*****"
+                },
+                "imiona": {
+                  "imie": "A********"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "W***"
+                },
+                "imiona": {
+                  "imie": "M*****"
+                },
+                "identyfikator": {
+                  "pesel": "4**********"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "dzial3": {
+        "celDzialaniaOrganizacji": {
+          "celDzialania": "CELEM DZIAŁANIA TOWARZYSTWA NAUKOWEGO KATOLICKIEGO UNIWRSYTETU LUBELSKIEGO JEST DZIAŁALNOŚĆ NAUKOWA ZGODNA Z PROFILEM KATOLOCKIEGO UNIWERSYTETU LUBELSKIEGO.CEL REALIZOWANY JEST PRZEZ:A)PROWADZENIE,ORGANIZOWANIE I POPIERANIE BADAŃ NAUKOWYCH,B)URZĄDANIE POSIEDZEŃ NAUKOWYCH,SYMPOZJÓW,ZJAZDÓW,RÓŻNEGO RODZAJU ODCZYTÓW I WYKŁADÓW ORAZ WYSTAW,C)TWORZENIE SPECJALNYCH BIBLIOTEK ARCHIWÓW I MUZEÓW,D)PUBLIKOWANIE WSZELKIEGO TYPU PRAC NAUKOWYCH,POPULARNO-NAUKOWYCH,PODRĘCZNIKÓW ORAZ SPRAWOZDAŃ Z DZIAŁALNOŚCI,E)UDZIELANIE ZASIŁKÓW NAUKOWYCH,OGŁASZANIE KONKURSÓW NA PRACE NAUKOWE I PRZYZNAWANIE NAGRÓD,F)WSPÓŁDZIAŁANIE Z INNYMI TOWARZYSTWAMI I INSTYTUCJAMI NAUKOWYMI."
+        }
+      },
+      "dzial4": {},
+      "dzial5": {},
+      "dzial6": {}
+    }
+  }
+}

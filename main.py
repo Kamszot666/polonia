@@ -7,6 +7,8 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
+import httpx
+
 from app.checkpoint.checkpoint_store import CheckpointStore
 from app.export.excel_exporter import export_to_excel
 from app.extract.contact_relation_extractor import (
@@ -15,6 +17,7 @@ from app.extract.contact_relation_extractor import (
     select_best_candidate,
 )
 from app.extract.email_extractor import find_emails, find_emails_in_html, score_email
+from app.extract.krs_registry import fetch_krs_record
 from app.extract.phone_extractor import count_phone_occurrences
 from app.extract.schema_extractor import extract_schema_data
 from app.extract.voivodeship_extractor import detect_voivodeship
@@ -25,13 +28,33 @@ from app.models.schemas import ContactPerson, FieldValue, Organization, Organiza
 from app.parse.html_parser import PageParser
 from app.parse.text_fallback import extract_clean_text
 from app.search.ddgs_search import DdgsOfficialSiteSearch
-from app.storage.input_reader import read_organization_names
+from app.storage.input_reader import (
+    is_full_schema_workbook,
+    read_organization_names,
+    read_organizations_from_workbook,
+)
 from app.validate.validators import validate_organization
 from config import Settings, settings
 
 
+def _needs_web_crawl(org: Organization) -> bool:
+    fields = (
+        org.email, org.phone, org.social_media, org.description,
+        org.contact_person.name, org.contact_person.email, org.contact_person.phone,
+    )
+    return any(field.is_empty for field in fields)
+
+
+def _needs_krs_lookup(org: Organization) -> bool:
+    return not org.krs.is_empty and any(
+        field.is_empty for field in (org.address, org.voivodeship, org.nip, org.industry)
+    )
+
+
 class OrganizationPipeline:
-    """Przetwarza jeden podmiot: search -> fetch -> parse -> extract -> validate (pkt 2-10 algorytmu)."""
+    """Uzupełnia braki w rekordzie podmiotu: KRS API -> search -> fetch -> parse -> extract ->
+    validate (pkt 2-10 algorytmu). Pola już wypełnione (np. z pliku wejściowego) nie są
+    nadpisywane - pipeline dokłada tylko to, czego brakuje."""
 
     def __init__(
         self,
@@ -39,34 +62,53 @@ class OrganizationPipeline:
         http_fetcher: HttpFetcher,
         browser_fetcher: BrowserFetcher,
         searcher: DdgsOfficialSiteSearch,
+        krs_client: httpx.AsyncClient,
     ) -> None:
         self._settings = settings
         self._http = http_fetcher
         self._browser = browser_fetcher
         self._searcher = searcher
+        self._krs_client = krs_client
 
-    async def process(self, organization_name: str) -> Organization:
-        org = Organization(input_name=organization_name, status=OrganizationStatus.IN_PROGRESS)
+    async def process(self, org: Organization) -> Organization:
+        org.status = OrganizationStatus.IN_PROGRESS
         try:
-            search_result = await self._searcher.find_official_site(organization_name)
-            if search_result is None:
-                org.status = OrganizationStatus.FAILED
-                org.error = "Brak wyników wyszukiwania"
-                return org
+            if _needs_krs_lookup(org):
+                await self._apply_krs_registry(org)
 
-            org.website = FieldValue(
-                value=search_result.url, source_url=search_result.url,
-                source_type=SourceType.SEARCH_RESULT, evidence=search_result.title, confidence=0.5,
-            )
+            if _needs_web_crawl(org):
+                if org.website.is_empty:
+                    search_result = await self._searcher.find_official_site(org.input_name)
+                    if search_result is not None:
+                        org.website = FieldValue(
+                            value=search_result.url, source_url=search_result.url,
+                            source_type=SourceType.SEARCH_RESULT, evidence=search_result.title, confidence=0.5,
+                        )
+                if not org.website.is_empty:
+                    await self._crawl_site(org, org.website.value)
 
-            await self._crawl_site(org, search_result.url)
             org = validate_organization(org, self._settings)
         except Exception as exc:
-            logger.exception(f"Błąd przetwarzania {organization_name!r}")
+            logger.exception(f"Błąd przetwarzania {org.input_name!r}")
             org.status = OrganizationStatus.FAILED
             org.error = str(exc)
         org.date_acquired = datetime.now().strftime("%d.%m.%Y")
         return org
+
+    async def _apply_krs_registry(self, org: Organization) -> None:
+        record = await fetch_krs_record(org.krs.value, self._krs_client)
+        if record is None:
+            return
+        if org.name.is_empty and not record.name.is_empty:
+            org.name = record.name
+        if org.address.is_empty and not record.address.is_empty:
+            org.address = record.address
+        if org.voivodeship.is_empty and not record.voivodeship.is_empty:
+            org.voivodeship = record.voivodeship
+        if org.nip.is_empty and not record.nip.is_empty:
+            org.nip = record.nip
+        if org.industry.is_empty and not record.industry.is_empty:
+            org.industry = record.industry
 
     async def _crawl_site(self, org: Organization, start_url: str) -> None:
         to_visit = [start_url]
@@ -175,29 +217,41 @@ class OrganizationPipeline:
         )
 
 
-async def run(input_path: Path, settings: Settings = settings) -> Path:
+def _load_seed_organizations(input_path: Path) -> list[Organization]:
+    if input_path.suffix.lower() in {".xlsx", ".xlsm"} and is_full_schema_workbook(input_path):
+        organizations = read_organizations_from_workbook(input_path)
+        logger.info(f"Wykryto pełny schemat bazy - wczytano {len(organizations)} organizacji do uzupełnienia")
+        return organizations
     names = read_organization_names(input_path)
+    logger.info(f"Wczytano {len(names)} nazw organizacji (lista bez wcześniejszych danych)")
+    return [Organization(input_name=name) for name in names]
+
+
+async def run(input_path: Path, settings: Settings = settings) -> Path:
+    seed_organizations = _load_seed_organizations(input_path)
     checkpoint = CheckpointStore(settings)
-    pending = checkpoint.pending_names(names)
-    logger.info(f"Wczytano {len(names)} nazw, do przetworzenia: {len(pending)} (reszta odczytana z checkpointu)")
+    pending = [org for org in seed_organizations if not checkpoint.is_done(org.input_name)]
+    logger.info(f"Do przetworzenia: {len(pending)} (reszta odczytana z checkpointu)")
 
     http_fetcher = HttpFetcher(settings)
     browser_fetcher = BrowserFetcher(settings)
     searcher = DdgsOfficialSiteSearch(settings)
-    pipeline = OrganizationPipeline(settings, http_fetcher, browser_fetcher, searcher)
+    krs_client = httpx.AsyncClient(headers={"User-Agent": settings.user_agent})
+    pipeline = OrganizationPipeline(settings, http_fetcher, browser_fetcher, searcher, krs_client)
     semaphore = asyncio.Semaphore(settings.max_concurrency)
 
-    async def process_one(name: str) -> None:
+    async def process_one(seed_org: Organization) -> None:
         async with semaphore:
-            org = await pipeline.process(name)
+            org = await pipeline.process(seed_org)
             checkpoint.save(org)
-            logger.info(f"{name}: status={org.status.value}")
+            logger.info(f"{org.input_name}: status={org.status.value}")
 
     try:
-        await asyncio.gather(*(process_one(name) for name in pending))
+        await asyncio.gather(*(process_one(org) for org in pending))
     finally:
         await http_fetcher.aclose()
         await browser_fetcher.stop()
+        await krs_client.aclose()
 
     all_results = checkpoint.load_all()
     checkpoint.close()

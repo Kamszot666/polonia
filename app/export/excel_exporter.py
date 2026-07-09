@@ -1,15 +1,15 @@
 """Zapis wyników do Excela przez openpyxl (pkt 11 algorytmu).
 
-Układ i nazwy kolumn 1-15 oraz konwencja wypełniania braków ("brak" / "nie ustalono"
+Układ i nazwy kolumn 1-19 oraz konwencja wypełniania braków ("brak" / "nie ustalono"
 zamiast pustej komórki) odpowiadają dostarczonej „Procedurze tworzenia bazy danych
-w Excelu”. Kolumny 16-17 (Status, Źródła i pewność) to rozszerzenie wymagane przez
+w Excelu” oraz realnemu plikowi bazy przekazanemu przez użytkownika (Lp. ... KRS,
+REGON, NIP). Kolumny 20-21 (Status, Źródła i pewność) to rozszerzenie wymagane przez
 instrukcję Polonia (pkt 9: każde pole musi mieć przypisane źródło i confidence) -
 procedura ogólna ich nie przewiduje, ale nie jest z nimi sprzeczna.
 
-"Kategoria" i "Branża / Typ" nie są automatycznie wykrywane - algorytm z instrukcji
-Polonia nie definiuje, jak je wyprowadzić z danych organizacji wspierających Polonię,
-więc kolumny istnieją (zgodność ze schematem formatki), ale zawsze "brak" do ręcznego
-uzupełnienia.
+"Kategoria" i "Branża / Typ" nie są w pełni automatycznie wykrywane - Branża bywa
+wypełniana z przeważającego przedmiotu działalności (PKD) z API KRS, gdy dostępne;
+w pozostałych przypadkach zostaje "brak" do ręcznego uzupełnienia.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ _HEADERS = (
     "Lp.", "Kategoria", "Branża / Typ", "Nazwa", "Adres korespondencyjny", "Województwo",
     "Numer telefonu", "Adres e-mail", "Strona WWW", "Profil w mediach społecznościowych",
     "Osoba kontaktowa", "Numer telefonu do osoby kontaktowej", "Adres e-mail do osoby kontaktowej",
-    "Data pozyskania informacji", "Krótka charakterystyka podmiotu",
+    "Data pozyskania informacji", "Krótka charakterystyka podmiotu", "URL źródła", "KRS", "REGON", "NIP",
     "Status", "Źródła i pewność",
 )
 
@@ -55,10 +55,11 @@ def export_to_excel(organizations: list[Organization], settings: Settings = sett
 
 def _organization_to_row(lp: int, org: Organization) -> list[str]:
     person = org.contact_person
+    contact_person_display = _format_contact_person(org)
     return [
         lp,
-        _BRAK,  # Kategoria - nie wykrywane automatycznie, patrz docstring modułu
-        _BRAK,  # Branża / Typ - jw.
+        org.category or _BRAK,
+        _value_or(org.industry, _BRAK),
         _value_or(org.name, _BRAK),
         _value_or(org.address, _BRAK),
         _value_or(org.voivodeship, _BRAK),
@@ -66,14 +67,26 @@ def _organization_to_row(lp: int, org: Organization) -> list[str]:
         _value_or(org.email, _BRAK),
         _value_or(org.website, _BRAK),
         _value_or(org.social_media, _BRAK),
-        _value_or(person.name, _NIE_USTALONO),
+        contact_person_display or _NIE_USTALONO,
         _value_or(person.phone, _BRAK),
         _value_or(person.email, _BRAK),
         org.date_acquired or _BRAK,
         _value_or(org.description, _BRAK),
+        org.origin_source_url or _BRAK,
+        _value_or(org.krs, _BRAK),
+        _value_or(org.regon, _BRAK),
+        _value_or(org.nip, _BRAK),
         org.status.value,
         _summarize_sources(org),
     ]
+
+
+def _format_contact_person(org: Organization) -> str:
+    name = org.contact_person.name.value
+    position = org.contact_person.position.value
+    if name and position:
+        return f"{name} ({position})"
+    return name or ""
 
 
 def _value_or(field: FieldValue, fallback: str) -> str:
@@ -87,7 +100,8 @@ def _summarize_sources(org: Organization) -> str:
         ("media społ.", org.social_media),
         ("osoba", org.contact_person.name), ("stanowisko", org.contact_person.position),
         ("telefon osoby", org.contact_person.phone), ("e-mail osoby", org.contact_person.email),
-        ("opis", org.description),
+        ("opis", org.description), ("branża", org.industry),
+        ("KRS", org.krs), ("REGON", org.regon), ("NIP", org.nip),
     ]
     parts = []
     for label, field in labeled_fields:
