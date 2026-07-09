@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from playwright.async_api import Browser, Playwright, async_playwright
 
 from app.fetch.http_client import FetchResult
@@ -19,7 +21,13 @@ class BrowserFetcher:
         if self._browser is not None:
             return
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.launch(headless=True)
+        # Chromium nie honoruje automatycznie HTTPS_PROXY z środowiska (w przeciwieństwie
+        # do httpx/curl) - trzeba je przekazać jawnie przy starcie przeglądarki.
+        https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+        proxy = {"server": https_proxy} if https_proxy else None
+        self._browser = await self._playwright.chromium.launch(
+            headless=True, executable_path=self._settings.playwright_executable_path, proxy=proxy,
+        )
 
     async def fetch(self, url: str) -> FetchResult:
         if self._browser is None:

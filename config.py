@@ -5,6 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Playwright pip może oczekiwać innej rewizji Chromium niż ta pre-zainstalowana w obrazie
+# (PLAYWRIGHT_BROWSERS_PATH) - jeśli plik binarny istnieje, wskazujemy go bezpośrednio
+# zamiast pozwalać Playwrightowi na próbę pobrania własnej wersji.
+_PREINSTALLED_CHROMIUM = Path("/opt/pw-browsers/chromium")
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -20,6 +25,9 @@ class Settings:
 
     # Playwright uruchamiany tylko gdy httpx nie da wystarczających danych
     playwright_timeout_ms: int = 20_000
+    playwright_executable_path: str | None = (
+        str(_PREINSTALLED_CHROMIUM) if _PREINSTALLED_CHROMIUM.exists() else None
+    )
     min_text_length_for_static_page: int = 400
 
     # Cache
@@ -29,6 +37,8 @@ class Settings:
     # Wyszukiwarka
     search_query_template: str = "{name} kontakt"
     search_max_results: int = 8
+    search_min_interval_seconds: float = 4.0  # odstęp między zapytaniami - wyszukiwarka bywa czuła na burst
+    search_max_retries: int = 3
 
     # Podstrony, które warto przeskanować
     subpage_keywords: tuple[str, ...] = (
@@ -72,6 +82,13 @@ class Settings:
     sentence_transformer_model_name: str = "sdadas/st-polish-paraphrase-from-distilroberta"
     ner_enabled: bool = False  # włączyć po zainstalowaniu i pobraniu modeli spaCy/GLiNER
     semantic_scoring_enabled: bool = False  # włączyć po zainstalowaniu modelu sentence-transformers
+    # HeuristicPersonNameDetector (bez NER) myli fragmenty nazwy własnej organizacji, zwroty
+    # z przycisków ("Wesprzyj nas na Facebooku") i odmienione przez przypadki słowa
+    # instytucjonalne z prawdziwymi osobami - zweryfikowane na realnych danych użytkownika
+    # (np. "Konto Fundacji", "Facebooka Wesprzyj" jako rzekome "osoby kontaktowe"). Dopóki
+    # ner_enabled=False, automatyczne przypisywanie osoby kontaktowej jest wyłączone -
+    # lepiej zostawić "nie ustalono" niż zapisać pewnie wyglądający, ale błędny wynik.
+    automatic_contact_person_enabled: bool = False
     semantic_score_weight: float = 0.15
 
     # OCR

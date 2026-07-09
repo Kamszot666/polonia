@@ -12,6 +12,29 @@ def test_heuristic_person_name_detector_finds_capitalized_pairs():
     assert "Jan Kowalski" in names
 
 
+def test_heuristic_person_name_detector_rejects_institutional_word_pairs():
+    """Zaobserwowane realnie: heurystyka łapała fragmenty nazwy własnej organizacji
+    ("Oświata Polska", "Katalogi Biblioteki") jako rzekome osoby."""
+    detector = HeuristicPersonNameDetector()
+    assert detector.detect("Fundacja Oświata Polska za Granicą wspiera szkoły.") == []
+    assert detector.detect("Katalogi Biblioteki dostępne online.") == []
+    # "Dom Polonii" samo w sobie jest odrzucane (słowo instytucjonalne "dom"), ale patron
+    # budynku ("Andrzeja Stelmachowskiego") to naprawdę istniejąca postać historyczna -
+    # heurystyka słusznie go wykrywa jako parę imię+nazwisko, mimo że to nie jest bieżący
+    # kontakt. Tego rozróżnienia nie da się zrobić bez NER/kontekstu.
+    names = detector.detect("Dom Polonii im. Andrzeja Stelmachowskiego")
+    assert "Dom Polonii" not in names
+
+
+def test_heuristic_person_name_detector_rejects_organization_name_tokens():
+    detector = HeuristicPersonNameDetector()
+    names = detector.detect(
+        "Towarzystwo Naukowe informuje: sekretarz Jan Kowalski",
+        organization_name='Towarzystwo Naukowe Katolickiego Uniwersytetu Lubelskiego',
+    )
+    assert names == ["Jan Kowalski"]
+
+
 def test_extract_contact_candidates_prefers_same_block():
     blocks = [
         DomBlock(

@@ -37,11 +37,10 @@ from app.validate.validators import validate_organization
 from config import Settings, settings
 
 
-def _needs_web_crawl(org: Organization) -> bool:
-    fields = (
-        org.email, org.phone, org.social_media, org.description,
-        org.contact_person.name, org.contact_person.email, org.contact_person.phone,
-    )
+def _needs_web_crawl(org: Organization, settings: Settings = settings) -> bool:
+    fields = [org.email, org.phone, org.social_media, org.description]
+    if settings.automatic_contact_person_enabled:
+        fields += [org.contact_person.name, org.contact_person.email, org.contact_person.phone]
     return any(field.is_empty for field in fields)
 
 
@@ -76,7 +75,7 @@ class OrganizationPipeline:
             if _needs_krs_lookup(org):
                 await self._apply_krs_registry(org)
 
-            if _needs_web_crawl(org):
+            if _needs_web_crawl(org, self._settings):
                 if org.website.is_empty:
                     search_result = await self._searcher.find_official_site(org.input_name)
                     if search_result is not None:
@@ -132,11 +131,18 @@ class OrganizationPipeline:
                 to_visit.extend(link for link in parser.find_subpage_links() if link not in visited)
 
             self._apply_text_fields(org, parser, html, url)
-            all_candidates.extend(extract_contact_candidates(parser.dom_blocks(), url, self._settings))
+            if self._settings.automatic_contact_person_enabled:
+                organization_name = org.name.value or org.input_name
+                all_candidates.extend(
+                    extract_contact_candidates(
+                        parser.dom_blocks(), url, self._settings, organization_name=organization_name,
+                    )
+                )
 
-        best_candidate = select_best_candidate(all_candidates, self._settings)
-        if best_candidate is not None:
-            org.contact_person = self._candidate_to_contact_person(best_candidate)
+        if self._settings.automatic_contact_person_enabled:
+            best_candidate = select_best_candidate(all_candidates, self._settings)
+            if best_candidate is not None:
+                org.contact_person = self._candidate_to_contact_person(best_candidate)
 
     async def _fetch_page(self, url: str) -> str | None:
         result = await self._http.fetch(url)

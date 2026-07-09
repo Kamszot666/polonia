@@ -1,8 +1,16 @@
-"""Wyszukiwanie oficjalnej strony podmiotu przez DuckDuckGo (kroki 2-3 algorytmu z instrukcji)."""
+"""Wyszukiwanie oficjalnej strony podmiotu przez DuckDuckGo (kroki 2-3 algorytmu z instrukcji).
+
+Backend "html_duckduckgo" (klasyczny, bezJS-owy interfejs DDG) jest jedynym, który
+zwrócił poprawne wyniki w tym środowisku - domyślny backend dawał "No results found",
+a bing/brave/yahoo kończyły się resetem połączenia (zweryfikowane empirycznie).
+Zachowujemy fallback na domyślny backend, gdyby ten akurat przestał działać gdzie
+indziej.
+"""
 
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass
 
 import tldextract
@@ -13,13 +21,18 @@ from config import Settings, settings
 
 try:
     from ddgs import DDGS
-except ImportError:  # starsza nazwa pakietu, wciąż szeroko używana
+    from ddgs.exceptions import DDGSException
+except ImportError:  # starsza nazwa pakietu
     from duckduckgo_search import DDGS
+    from duckduckgo_search.exceptions import DuckDuckGoSearchException as DDGSException
+
+_PREFERRED_BACKENDS = ("html_duckduckgo", None)
 
 _SOCIAL_AND_DIRECTORY_DOMAINS = {
     "facebook.com", "instagram.com", "linkedin.com", "twitter.com", "x.com",
     "youtube.com", "tiktok.com", "wikipedia.org", "wikipedia.pl",
     "ngo.pl", "rejestr.io", "aleo.com", "panoramafirm.pl", "olx.pl", "gowork.pl",
+    "cylex-polska.pl",
 }
 
 
@@ -31,31 +44,61 @@ class SearchResult:
 
 
 class DdgsOfficialSiteSearch:
-    """Wyszukuje najbardziej prawdopodobną oficjalną stronę podmiotu."""
+    """Wyszukuje najbardziej prawdopodobną oficjalną stronę podmiotu.
+
+    Wymusza minimalny odstęp między zapytaniami (config.search_min_interval_seconds) -
+    wyszukiwarka zaczyna zwracać błędy połączenia po serii szybkich zapytań pod rząd
+    (zweryfikowane empirycznie), więc współbieżne przetwarzanie wielu podmiotów nie
+    powinno odpytywać jej równolegle."""
 
     def __init__(self, settings: Settings = settings) -> None:
         self._settings = settings
+        self._rate_limit_lock = asyncio.Lock()
+        self._last_call_at = 0.0
 
     async def find_official_site(self, organization_name: str) -> SearchResult | None:
         query = self._settings.search_query_template.format(name=organization_name)
+        await self._respect_rate_limit()
         results = await asyncio.to_thread(self._search_sync, query)
         if not results:
             logger.warning(f"Brak wyników wyszukiwania dla: {organization_name!r}")
             return None
         return self._pick_best(organization_name, results)
 
+    async def _respect_rate_limit(self) -> None:
+        async with self._rate_limit_lock:
+            now = asyncio.get_event_loop().time()
+            wait = self._settings.search_min_interval_seconds - (now - self._last_call_at)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call_at = asyncio.get_event_loop().time()
+
     def _search_sync(self, query: str) -> list[SearchResult]:
-        with DDGS() as ddgs:
-            raw = ddgs.text(query, max_results=self._settings.search_max_results, region="pl-pl")
-        return [
-            SearchResult(
-                title=item.get("title", ""),
-                url=item.get("href") or item.get("url", ""),
-                snippet=item.get("body", ""),
-            )
-            for item in raw
-            if item.get("href") or item.get("url")
-        ]
+        last_error: Exception | None = None
+        for backend in _PREFERRED_BACKENDS:
+            kwargs = {"max_results": self._settings.search_max_results, "region": "pl-pl"}
+            if backend is not None:
+                kwargs["backend"] = backend
+            for attempt in range(1, self._settings.search_max_retries + 1):
+                try:
+                    with DDGS(timeout=20) as ddgs:
+                        raw = ddgs.text(query, **kwargs)
+                    return [
+                        SearchResult(
+                            title=item.get("title", ""),
+                            url=item.get("href") or item.get("url", ""),
+                            snippet=item.get("body", ""),
+                        )
+                        for item in raw
+                        if item.get("href") or item.get("url")
+                    ]
+                except DDGSException as exc:
+                    logger.debug(f"Backend {backend!r} próba {attempt} nieudana dla {query!r}: {exc}")
+                    last_error = exc
+                    if attempt < self._settings.search_max_retries:
+                        time.sleep(self._settings.backoff_base_seconds * attempt)
+        logger.warning(f"Wszystkie backendy wyszukiwania zawiodły dla {query!r}: {last_error}")
+        return []
 
     def _pick_best(self, organization_name: str, results: list[SearchResult]) -> SearchResult | None:
         candidates = [r for r in results if not self._is_excluded_domain(r.url)]

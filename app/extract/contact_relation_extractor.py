@@ -38,6 +38,18 @@ _NAME_FALSE_POSITIVES = {
     "Krajowy Rejestr", "Polityka Prywatności", "Wszystkie Prawa",
 }
 
+# Słowa instytucjonalne, które w parze wielkich liter łudząco przypominają Imię+Nazwisko
+# (np. "Oświata Polska", "Dom Polonii", "Katalogi Biblioteki") - zaobserwowane realnie przy
+# uruchomieniu na nazwach organizacji z bazy użytkownika, gdzie heurystyka łapała fragmenty
+# nazwy własnej podmiotu zamiast osoby.
+_INSTITUTIONAL_WORDS = {
+    "towarzystwo", "stowarzyszenie", "fundacja", "zarząd", "rada", "dom", "katalog", "katalogi",
+    "biblioteka", "biblioteki", "zespół", "sekretariat", "biuro", "instytut", "centrum", "muzeum",
+    "redakcja", "wydawnictwo", "komitet", "komisja", "klub", "koło", "związek", "unia", "liga",
+    "polonia", "polski", "polska", "polskie", "narodowy", "narodowa", "krajowy", "krajowa",
+    "naukowe", "naukowy", "społeczne", "społeczna", "kulturalne", "kulturalna", "oświata",
+}
+
 _INTENT_REFERENCE_SENTENCES = (
     "osoba kontaktowa w organizacji",
     "kontakt w sprawie współpracy",
@@ -50,19 +62,33 @@ _INTENT_REFERENCE_SENTENCES = (
 
 
 class PersonNameDetector(Protocol):
-    def detect(self, text: str) -> list[str]: ...
+    def detect(self, text: str, organization_name: str | None = None) -> list[str]: ...
 
 
 class HeuristicPersonNameDetector:
-    """Wykrywa pary Imię+Nazwisko po wielkich literach. Prosty fallback do czasu integracji NER."""
+    """Wykrywa pary Imię+Nazwisko po wielkich literach. Prosty fallback do czasu integracji NER.
 
-    def detect(self, text: str) -> list[str]:
+    Odrzuca kandydatów zawierających słowo instytucjonalne (_INSTITUTIONAL_WORDS) lub token
+    pochodzący z nazwy samej organizacji - inaczej łapie fragmenty własnej nazwy podmiotu."""
+
+    def detect(self, text: str, organization_name: str | None = None) -> list[str]:
+        excluded_tokens = _INSTITUTIONAL_WORDS | self._organization_tokens(organization_name)
         found: dict[str, None] = {}
         for match in _NAME_PATTERN.finditer(text):
-            candidate = f"{match.group(1)} {match.group(2)}"
-            if candidate not in _NAME_FALSE_POSITIVES:
-                found[candidate] = None
+            first, second = match.group(1), match.group(2)
+            candidate = f"{first} {second}"
+            if candidate in _NAME_FALSE_POSITIVES:
+                continue
+            if first.lower() in excluded_tokens or second.lower() in excluded_tokens:
+                continue
+            found[candidate] = None
         return list(found)
+
+    @staticmethod
+    def _organization_tokens(organization_name: str | None) -> set[str]:
+        if not organization_name:
+            return set()
+        return {token.lower().strip('"\'.,()') for token in organization_name.split() if len(token) > 2}
 
 
 class NerPersonNameDetector:
@@ -86,18 +112,23 @@ class NerPersonNameDetector:
 
             self._gliner_model = GLiNER.from_pretrained(self._settings.gliner_model_name)
 
-    def detect(self, text: str) -> list[str]:
+    def detect(self, text: str, organization_name: str | None = None) -> list[str]:
         self._ensure_models_loaded()
+        excluded_tokens = HeuristicPersonNameDetector._organization_tokens(organization_name)
         found: dict[str, None] = {}
 
         for ent in self._spacy_nlp(text).ents:
             if ent.label_ in self._SPACY_PERSON_LABELS:
-                found[ent.text.strip()] = None
+                candidate = ent.text.strip()
+                if not any(token.lower() in excluded_tokens for token in candidate.split()):
+                    found[candidate] = None
 
         for entity in self._gliner_model.predict_entities(
             text, labels=["osoba kontaktowa", "członek zarządu", "koordynator"]
         ):
-            found[entity["text"].strip()] = None
+            candidate = entity["text"].strip()
+            if not any(token.lower() in excluded_tokens for token in candidate.split()):
+                found[candidate] = None
 
         return list(found)
 
@@ -139,6 +170,7 @@ def extract_contact_candidates(
     settings: Settings = settings,
     person_detector: PersonNameDetector | None = None,
     semantic_scorer: SemanticIntentScorer | None = None,
+    organization_name: str | None = None,
 ) -> list[ContactCandidate]:
     detector = person_detector or get_person_name_detector(settings)
     candidates: list[ContactCandidate] = []
@@ -147,7 +179,7 @@ def extract_contact_candidates(
         text = block.text
         emails = list(dict.fromkeys(find_emails(text) + find_emails_in_html(block.html)))
         phones = find_phones(text)
-        persons = detector.detect(text)
+        persons = detector.detect(text, organization_name)
         position, position_ratio = _best_position_match(text)
 
         if not (emails or phones or persons or position):
