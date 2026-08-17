@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+*.egg-info/
+build/
+dist/
 
 # Dane wykonawcze - checkpoint, cache stron, logi, wynik Excela
 data/
