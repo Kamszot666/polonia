@@ -69,6 +69,14 @@ class HttpFetcher:
             try:
                 response = await self._client.get(url)
                 response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                if "html" not in content_type.lower() and content_type:
+                    # Zweryfikowane realnie: linki do PDF/JPG na stronach organizacji trafiały
+                    # tu jako "podstrona" i selectolax wywalał się próbując zdekodować binarną
+                    # treść jako HTML (UnicodeDecodeError). Traktujemy to jak brak treści HTML.
+                    logger.debug(f"Pomijam nie-HTML odpowiedź dla {url}: content-type={content_type}")
+                    return FetchResult(url=url, html=None, status_code=response.status_code, from_cache=False,
+                                        error=f"nie-HTML content-type: {content_type}")
                 return FetchResult(url=url, html=response.text, status_code=response.status_code, from_cache=False)
             except httpx.HTTPStatusError as exc:
                 last_error = f"HTTP {exc.response.status_code}"

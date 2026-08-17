@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 import tldextract
 from rapidfuzz import fuzz
@@ -128,7 +129,13 @@ class DdgsOfficialSiteSearch:
 
     @staticmethod
     def _is_excluded_result(url: str) -> bool:
-        if url.lower().endswith(".pdf"):
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            # Zweryfikowane realnie: wyszukiwarka czasem zwraca własny link przekierowania
+            # (np. "/clev?event=StartpageResultClick&...") zamiast prawdziwego adresu strony -
+            # próba użycia go jako "strony WWW" wywalała się przy budowaniu żądania httpx.
+            return True
+        if url.lower().split("?")[0].endswith((".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx")):
             return True
         extracted = tldextract.extract(url)
         registered_domain = f"{extracted.domain}.{extracted.suffix}".lower()

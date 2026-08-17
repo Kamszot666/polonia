@@ -8,7 +8,18 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from app.fetch.url_utils import normalize_url
+from app.logging.logger import logger
 from config import Settings, settings
+
+# Rozszerzenia plików, które nie są stronami HTML - link do nich bywa oznaczony słowem
+# kluczowym podstrony (np. "Statut (PDF)" pod linkiem "kontakt-do-zarzadu.pdf") i trafiał
+# do kolejki crawlowania, gdzie próba potraktowania binarnej treści jako HTML wywalała się
+# (zweryfikowane realnie: UnicodeDecodeError na PDF/JPG).
+_NON_HTML_EXTENSIONS = (
+    ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".rar",
+    ".mp3", ".mp4", ".avi", ".mov",
+)
 
 
 @dataclass(slots=True)
@@ -33,6 +44,8 @@ class PageParser:
             href = anchor.attributes.get("href")
             if not href or href.startswith(("mailto:", "tel:", "javascript:", "#")):
                 continue
+            if href.lower().split("?")[0].endswith(_NON_HTML_EXTENSIONS):
+                continue
             text = (anchor.text() or "").strip().lower()
             haystack = f"{text} {href.lower()}"
             if any(keyword in haystack for keyword in self._settings.subpage_keywords):
@@ -48,7 +61,15 @@ class PageParser:
             text = (node.text(separator=" ", deep=True) or "").strip()
             if not text:
                 continue
-            blocks.append(DomBlock(selector_path=f"{node.tag}[{index}]", html=node.html or "", text=text))
+            try:
+                node_html = node.html or ""
+            except UnicodeDecodeError:
+                # Siatka bezpieczeństwa: nawet strona ze zgłoszonym content-type "html" może
+                # zawierać pojedynczy blok z uszkodzonym/mieszanym kodowaniem - pomijamy tylko
+                # ten węzeł zamiast wywalać przetwarzanie całej organizacji.
+                logger.debug(f"Pominięto węzeł {node.tag}[{index}] - błąd dekodowania")
+                continue
+            blocks.append(DomBlock(selector_path=f"{node.tag}[{index}]", html=node_html, text=text))
         return blocks
 
     def full_text(self) -> str:
