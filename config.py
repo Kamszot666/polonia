@@ -76,20 +76,34 @@ class Settings:
     verify_mx_records: bool = True
     dns_resolver_timeout_seconds: float = 5.0
 
-    # NER / NLP (używane przez contact_relation_extractor w kolejnym etapie rozbudowy)
+    # NER / NLP - wymaga wcześniejszego: pip install spacy gliner oraz
+    # "python -m spacy download pl_core_news_lg" (main.py sprawdza to na starcie i przerywa
+    # z czytelnym komunikatem, jeśli model nie jest zainstalowany, zamiast wywalać się na
+    # każdej organizacji z osobna).
     spacy_model_name: str = "pl_core_news_lg"
     gliner_model_name: str = "urchade/gliner_multi-v2.1"
     sentence_transformer_model_name: str = "sdadas/st-polish-paraphrase-from-distilroberta"
-    ner_enabled: bool = False  # włączyć po zainstalowaniu i pobraniu modeli spaCy/GLiNER
+    ner_enabled: bool = True
     semantic_scoring_enabled: bool = False  # włączyć po zainstalowaniu modelu sentence-transformers
-    # HeuristicPersonNameDetector (bez NER) myli fragmenty nazwy własnej organizacji, zwroty
+    # HeuristicPersonNameDetector (bez NER) myliła fragmenty nazwy własnej organizacji, zwroty
     # z przycisków ("Wesprzyj nas na Facebooku") i odmienione przez przypadki słowa
     # instytucjonalne z prawdziwymi osobami - zweryfikowane na realnych danych użytkownika
-    # (np. "Konto Fundacji", "Facebooka Wesprzyj" jako rzekome "osoby kontaktowe"). Dopóki
-    # ner_enabled=False, automatyczne przypisywanie osoby kontaktowej jest wyłączone -
-    # lepiej zostawić "nie ustalono" niż zapisać pewnie wyglądający, ale błędny wynik.
-    automatic_contact_person_enabled: bool = False
+    # (np. "Konto Fundacji", "Facebooka Wesprzyj" jako rzekome "osoby kontaktowe"). Z
+    # ner_enabled=True (spaCy+GLiNER) rozpoznawanie osób jest wystarczająco wiarygodne, by
+    # włączyć automatyczne przypisywanie osoby kontaktowej.
+    automatic_contact_person_enabled: bool = True
+    # Próg dopasowania (RapidFuzz) między już znanym nazwiskiem osoby kontaktowej a kandydatem
+    # znalezionym na stronie - używany do dołączenia telefonu/e-maila do ZNANEJ osoby zamiast
+    # zgadywania z przypadkowego, niepowiązanego kandydata.
+    contact_person_name_match_threshold: float = 80.0
     semantic_score_weight: float = 0.15
+
+    # Wzbogacanie "Krótkiej charakterystyki podmiotu" - domyślnie pipeline tylko wypełnia puste
+    # pole; z tą flagą dokleja też dodatkowy opis znaleziony na stronie do istniejącego, jeśli
+    # ten jest ubogi (krótszy niż description_enrich_min_length), zamiast zostawiać go bez zmian.
+    enrich_short_descriptions: bool = True
+    description_enrich_min_length: int = 200
+    description_max_length: int = 600
 
     # OCR
     ocr_languages: tuple[str, ...] = ("pl", "en")

@@ -14,6 +14,7 @@ from app.export.excel_exporter import export_to_excel
 from app.extract.contact_relation_extractor import (
     ContactCandidate,
     extract_contact_candidates,
+    find_candidate_matching_name,
     select_best_candidate,
 )
 from app.extract.email_extractor import find_emails, find_emails_in_html, score_email
@@ -41,7 +42,11 @@ def _needs_web_crawl(org: Organization, settings: Settings = settings) -> bool:
     fields = [org.email, org.phone, org.social_media, org.description]
     if settings.automatic_contact_person_enabled:
         fields += [org.contact_person.name, org.contact_person.email, org.contact_person.phone]
-    return any(field.is_empty for field in fields)
+    if any(field.is_empty for field in fields):
+        return True
+    if settings.enrich_short_descriptions and len(org.description.value) < settings.description_enrich_min_length:
+        return True
+    return False
 
 
 def _needs_krs_lookup(org: Organization) -> bool:
@@ -140,9 +145,28 @@ class OrganizationPipeline:
                 )
 
         if self._settings.automatic_contact_person_enabled:
-            best_candidate = select_best_candidate(all_candidates, self._settings)
-            if best_candidate is not None:
-                org.contact_person = self._candidate_to_contact_person(best_candidate)
+            self._apply_contact_person(org, all_candidates)
+
+    def _apply_contact_person(self, org: Organization, all_candidates: list[ContactCandidate]) -> None:
+        known_name = org.contact_person.name
+        if not known_name.is_empty:
+            # Nazwisko już znane (np. z pliku wejściowego) - dołączamy telefon/e-mail/stanowisko
+            # tylko od kandydata dotyczącego TEJ SAMEJ osoby, nigdy nie nadpisujemy nazwiska.
+            matching = find_candidate_matching_name(all_candidates, known_name.value, self._settings)
+            if matching is None:
+                return
+            candidate_person = self._candidate_to_contact_person(matching)
+            if org.contact_person.position.is_empty:
+                org.contact_person.position = candidate_person.position
+            if org.contact_person.phone.is_empty:
+                org.contact_person.phone = candidate_person.phone
+            if org.contact_person.email.is_empty:
+                org.contact_person.email = candidate_person.email
+            return
+
+        best_candidate = select_best_candidate(all_candidates, self._settings)
+        if best_candidate is not None:
+            org.contact_person = self._candidate_to_contact_person(best_candidate)
 
     async def _fetch_page(self, url: str) -> str | None:
         result = await self._http.fetch(url)
@@ -200,14 +224,34 @@ class OrganizationPipeline:
                 org.voivodeship = FieldValue(value=voivodeship, source_url=url,
                                               source_type=SourceType.PAGE_TEXT, evidence=combined_text[:200],
                                               confidence=0.5)
+        self._apply_description(org, meta_description, text, url)
+
+    def _apply_description(self, org: Organization, meta_description: str, text: str, url: str) -> None:
+        candidate_text = meta_description or text.strip()
+        if not candidate_text:
+            return
+        candidate_source = SourceType.META_TAG if meta_description else SourceType.PAGE_TEXT
+        candidate_confidence = 0.7 if meta_description else 0.4
+
         if org.description.is_empty:
-            if meta_description:
-                org.description = FieldValue(value=meta_description[:300], source_url=url,
-                                              source_type=SourceType.META_TAG, evidence=meta_description,
-                                              confidence=0.7)
-            elif text.strip():
-                org.description = FieldValue(value=text.strip()[:300], source_url=url,
-                                              source_type=SourceType.PAGE_TEXT, evidence=text[:200], confidence=0.4)
+            org.description = FieldValue(value=candidate_text[: self._settings.description_max_length],
+                                          source_url=url, source_type=candidate_source, evidence=candidate_text[:200],
+                                          confidence=candidate_confidence)
+            return
+
+        if not self._settings.enrich_short_descriptions:
+            return
+        if len(org.description.value) >= self._settings.description_enrich_min_length:
+            return
+        # Nie doklejaj tej samej treści drugi raz (np. gdy ten sam fragment występuje na kilku
+        # przeszukanych podstronach).
+        if candidate_text[:80] in org.description.value:
+            return
+        combined = f"{org.description.value} {candidate_text}".strip()
+        org.description = FieldValue(
+            value=combined[: self._settings.description_max_length], source_url=url, source_type=candidate_source,
+            evidence=candidate_text[:200], confidence=max(org.description.confidence, candidate_confidence),
+        )
 
     @staticmethod
     def _candidate_to_contact_person(candidate: ContactCandidate) -> ContactPerson:
@@ -233,7 +277,27 @@ def _load_seed_organizations(input_path: Path) -> list[Organization]:
     return [Organization(input_name=name) for name in names]
 
 
+def _check_ner_prerequisites(settings: Settings) -> None:
+    """Sprawdza raz na starcie, czy model spaCy jest zainstalowany - zamiast wywalać się na
+    każdej ze 372 organizacji z osobna z tym samym błędem, gdy ner_enabled=True bez pobranego
+    modelu."""
+    if not settings.ner_enabled:
+        return
+    try:
+        import spacy
+
+        spacy.load(settings.spacy_model_name)
+    except OSError as exc:
+        raise SystemExit(
+            f"config.ner_enabled=True, ale model spaCy {settings.spacy_model_name!r} nie jest "
+            f"zainstalowany. Uruchom: python -m spacy download {settings.spacy_model_name}\n"
+            f"(albo ustaw ner_enabled=False w config.py, żeby wrócić do prostszej heurystyki)\n"
+            f"Szczegóły: {exc}"
+        ) from exc
+
+
 async def run(input_path: Path, settings: Settings = settings) -> Path:
+    _check_ner_prerequisites(settings)
     seed_organizations = _load_seed_organizations(input_path)
     checkpoint = CheckpointStore(settings)
     pending = [org for org in seed_organizations if not checkpoint.is_done(org.input_name)]

@@ -6,7 +6,11 @@ w prawdziwą strukturę stron, a nie tylko w wymyślone dane syntetyczne.
 
 from pathlib import Path
 
-from app.extract.contact_relation_extractor import extract_contact_candidates, select_best_candidate
+from app.extract.contact_relation_extractor import (
+    HeuristicPersonNameDetector,
+    extract_contact_candidates,
+    select_best_candidate,
+)
 from app.extract.email_extractor import find_emails_in_html
 from app.parse.html_parser import PageParser
 
@@ -26,7 +30,9 @@ def test_pol_org_pl_team_table_rows_yield_high_confidence_candidate():
     blocks = parser.dom_blocks()
     assert any(block.selector_path.startswith("tr[") for block in blocks)
 
-    candidates = extract_contact_candidates(blocks, source_url="https://pol.org.pl/zespol-fundacji/")
+    candidates = extract_contact_candidates(
+        blocks, source_url="https://pol.org.pl/zespol-fundacji/", person_detector=HeuristicPersonNameDetector(),
+    )
     best = select_best_candidate(candidates)
 
     assert best is not None
@@ -63,7 +69,8 @@ def test_wspolnotapolska_board_block_without_email_gets_low_confidence():
     parser = PageParser(html, base_url="https://wspolnotapolska.org.pl/stowarzyszenie/wladze.php")
 
     candidates = extract_contact_candidates(
-        parser.dom_blocks(), source_url="https://wspolnotapolska.org.pl/stowarzyszenie/wladze.php"
+        parser.dom_blocks(), source_url="https://wspolnotapolska.org.pl/stowarzyszenie/wladze.php",
+        person_detector=HeuristicPersonNameDetector(),
     )
     best = select_best_candidate(candidates)
 

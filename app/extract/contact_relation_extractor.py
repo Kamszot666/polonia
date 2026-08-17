@@ -229,6 +229,26 @@ def select_best_candidate(
     return best
 
 
+def find_candidate_matching_name(
+    candidates: list[ContactCandidate], known_name: str, settings: Settings = settings
+) -> ContactCandidate | None:
+    """Gdy osoba kontaktowa jest już znana (np. z pliku wejściowego), szuka wśród kandydatów
+    tego, który dotyczy TEJ SAMEJ osoby (dopasowanie nazwiska przez RapidFuzz) - żeby dołożyć
+    tylko jej telefon/e-mail/stanowisko, zamiast brać najlepszego, ale niepowiązanego kandydata
+    z innej części strony (np. innego członka zarządu)."""
+    scored = [
+        (candidate, fuzz.token_sort_ratio(known_name, candidate.person_name))
+        for candidate in candidates
+        if candidate.person_name
+    ]
+    if not scored:
+        return None
+    best_candidate, best_ratio = max(scored, key=lambda pair: pair[1])
+    if best_ratio < settings.contact_person_name_match_threshold:
+        return None
+    return best_candidate
+
+
 def _score_candidate(
     *, person: str | None, position: str | None, position_ratio: float,
     email: str | None, phone: str | None, settings: Settings,
