@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -18,10 +20,17 @@ from app.extract.contact_relation_extractor import (
     get_person_name_detector,
     select_best_candidate,
 )
-from app.extract.email_extractor import find_emails, find_emails_in_html, score_email
+from app.extract.email_extractor import (
+    find_emails,
+    find_emails_in_html,
+    rank_emails,
+    registered_domain,
+    score_email,
+)
 from app.extract.krs_registry import fetch_krs_record
 from app.extract.phone_extractor import count_phone_occurrences
 from app.extract.schema_extractor import extract_schema_data
+from app.extract.social_media_extractor import find_social_media_links, platform_of
 from app.extract.voivodeship_extractor import detect_voivodeship
 from app.fetch.browser_client import BrowserFetcher
 from app.fetch.http_client import HttpFetcher, needs_browser_rendering
@@ -48,6 +57,46 @@ def _needs_web_crawl(org: Organization, settings: Settings = settings) -> bool:
     if settings.enrich_short_descriptions and len(org.description.value) < settings.description_enrich_min_length:
         return True
     return False
+
+
+@dataclass(slots=True)
+class _CrawlFindings:
+    """Kontakty zebrane ze wszystkich podstron jednego serwisu.
+
+    Zbierane przez cały crawl i rozliczane dopiero na końcu, bo o tym, które trzy adresy
+    i numery zostaną w arkuszu, decyduje porównanie wszystkich znalezionych - a te trafiają
+    się na różnych podstronach (centrala na stronie głównej, sekretariat na "Kontakt")."""
+
+    emails: list[str] = field(default_factory=list)
+    email_sources: dict[str, str] = field(default_factory=dict)
+    phone_counts: Counter[str] = field(default_factory=Counter)
+    phone_sources: dict[str, str] = field(default_factory=dict)
+    social_links: list[str] = field(default_factory=list)
+    social_source_url: str | None = None
+
+    def add_emails(self, emails: list[str], url: str) -> None:
+        for email in emails:
+            self.emails.append(email)
+            self.email_sources.setdefault(email.lower(), url)
+
+    def add_phones(self, counts: Counter[str], url: str) -> None:
+        self.phone_counts.update(counts)
+        for phone in counts:
+            self.phone_sources.setdefault(phone, url)
+
+    def add_social_links(self, links: list[str], url: str) -> None:
+        # Jeden profil na serwis w obrębie całej witryny: ten sam Facebook bywa linkowany
+        # inaczej na stronie głównej niż w stopce podstrony kontaktowej, a stronę logowania
+        # („zaloguj się, by zobaczyć profil") widać jako osobny adres tego samego serwisu.
+        seen_platforms = {platform_of(link) for link in self.social_links}
+        for link in links:
+            platform = platform_of(link)
+            if platform in seen_platforms:
+                continue
+            seen_platforms.add(platform)
+            self.social_links.append(link)
+            if self.social_source_url is None:
+                self.social_source_url = url
 
 
 def _needs_krs_lookup(org: Organization) -> bool:
@@ -127,11 +176,13 @@ class OrganizationPipeline:
         self._apply_schema_data(org, start_html, start_url)
         subpage_urls = [url for url in start_parser.find_subpage_links() if url != start_url]
 
-        all_candidates = await self._analyze_page(org, start_parser, start_html, start_url)
+        findings = _CrawlFindings()
+        all_candidates = await self._analyze_page(org, start_parser, start_html, start_url, findings)
         for url, html in await self._fetch_subpages(subpage_urls):
             parser = PageParser(html, url, self._settings)
-            all_candidates.extend(await self._analyze_page(org, parser, html, url))
+            all_candidates.extend(await self._analyze_page(org, parser, html, url, findings))
 
+        self._apply_collected_contacts(org, findings)
         if self._settings.automatic_contact_person_enabled:
             self._apply_contact_person(org, all_candidates)
 
@@ -157,9 +208,9 @@ class OrganizationPipeline:
         return fetched
 
     async def _analyze_page(
-        self, org: Organization, parser: PageParser, html: str, url: str
+        self, org: Organization, parser: PageParser, html: str, url: str, findings: _CrawlFindings
     ) -> list[ContactCandidate]:
-        self._apply_text_fields(org, parser, html, url)
+        self._apply_text_fields(org, parser, html, url, findings)
         if not self._settings.automatic_contact_person_enabled:
             return []
         organization_name = org.name.value or org.input_name
@@ -220,7 +271,9 @@ class OrganizationPipeline:
                 source_type=SourceType.SCHEMA_ORG, evidence="schema.org:sameAs", confidence=0.85,
             )
 
-    def _apply_text_fields(self, org: Organization, parser: PageParser, html: str, url: str) -> None:
+    def _apply_text_fields(
+        self, org: Organization, parser: PageParser, html: str, url: str, findings: _CrawlFindings
+    ) -> None:
         text = parser.full_text()
         if len(text) < self._settings.min_text_length_for_static_page:
             text = extract_clean_text(html, url) or text
@@ -229,22 +282,25 @@ class OrganizationPipeline:
         # skondensowane dane kontaktowe - potwierdzone na pol.org.pl. Doklejamy do puli tekstu do analizy.
         combined_text = f"{meta_description}\n{text}" if meta_description else text
 
-        if org.email.is_empty:
-            # Regex na tekście nie wystarcza - część adresów jest zasłonięta przez Cloudflare
-            # email-obfuscation (data-cfemail), niewidoczna w body.text() (potwierdzone na wid.org.pl).
-            email_candidates = list(dict.fromkeys(find_emails(combined_text) + find_emails_in_html(html)))
-            if email_candidates:
-                best_email = max(email_candidates, key=score_email)
-                org.email = FieldValue(value=best_email, source_url=url, source_type=SourceType.REGEX,
-                                        evidence=combined_text[:200], confidence=score_email(best_email))
-        if org.phone.is_empty:
-            # Numer centrali zwykle powtarza się najczęściej (np. w każdym wierszu tabeli zespołu
-            # na pol.org.pl), więc najczęstszy numer jest lepszym sygnałem niż pierwszy napotkany.
-            phone_counts = count_phone_occurrences(combined_text)
-            if phone_counts:
-                main_phone, _ = phone_counts.most_common(1)[0]
-                org.phone = FieldValue(value=main_phone, source_url=url, source_type=SourceType.REGEX,
-                                        evidence=combined_text[:200], confidence=0.6)
+        # Regex na tekście nie wystarcza - część adresów jest zasłonięta przez Cloudflare
+        # email-obfuscation (data-cfemail), niewidoczna w body.text() (potwierdzone na wid.org.pl).
+        email_candidates = list(dict.fromkeys(find_emails(combined_text) + find_emails_in_html(html)))
+        findings.add_emails(email_candidates, url)
+        # Numer centrali zwykle powtarza się najczęściej (np. w każdym wierszu tabeli zespołu
+        # na pol.org.pl), więc najczęstszy numer jest lepszym sygnałem niż pierwszy napotkany.
+        phone_counts = count_phone_occurrences(combined_text)
+        findings.add_phones(phone_counts, url)
+        if self._settings.collect_social_media_links:
+            findings.add_social_links(find_social_media_links(html, url), url)
+
+        if org.email.is_empty and email_candidates:
+            best_email = max(email_candidates, key=score_email)
+            org.email = FieldValue(value=best_email, source_url=url, source_type=SourceType.REGEX,
+                                    evidence=combined_text[:200], confidence=score_email(best_email))
+        if org.phone.is_empty and phone_counts:
+            main_phone, _ = phone_counts.most_common(1)[0]
+            org.phone = FieldValue(value=main_phone, source_url=url, source_type=SourceType.REGEX,
+                                    evidence=combined_text[:200], confidence=0.6)
         if org.voivodeship.is_empty:
             voivodeship = detect_voivodeship(org.address.value or combined_text)
             if voivodeship:
@@ -252,6 +308,61 @@ class OrganizationPipeline:
                                               source_type=SourceType.PAGE_TEXT, evidence=combined_text[:200],
                                               confidence=0.5)
         self._apply_description(org, meta_description, text, url)
+
+    def _apply_collected_contacts(self, org: Organization, findings: _CrawlFindings) -> None:
+        """Dokłada dodatkowe adresy i telefony obok już wpisanego oraz uzupełnia profile
+        społecznościowe. Wartość z pliku wejściowego zostaje pierwsza i nietknięta - nowe
+        są dopisywane za nią, do limitu z konfiguracji."""
+        if self._settings.collect_social_media_links and org.social_media.is_empty and findings.social_links:
+            org.social_media = FieldValue(
+                value=self._settings.contact_list_separator.join(findings.social_links),
+                source_url=findings.social_source_url, source_type=SourceType.PAGE_TEXT,
+                evidence="linki do profili w treści strony", confidence=0.7,
+            )
+
+        if not self._settings.collect_additional_contacts:
+            return
+
+        own_domain = registered_domain(org.website.value) if not org.website.is_empty else None
+        ranked_emails = rank_emails(
+            findings.emails, self._settings.max_emails_per_organization, own_domain,
+        )
+        org.email = self._merge_contact_list(
+            org.email, ranked_emails, self._settings.max_emails_per_organization,
+            findings.email_sources, "dodatkowe adresy ze strony",
+        )
+        # Kolejność telefonów po częstości - numer centrali powtarza się na stronie najczęściej.
+        ranked_phones = [phone for phone, _ in findings.phone_counts.most_common(
+            self._settings.max_phones_per_organization
+        )]
+        org.phone = self._merge_contact_list(
+            org.phone, ranked_phones, self._settings.max_phones_per_organization,
+            findings.phone_sources, "dodatkowe numery ze strony",
+        )
+
+    def _merge_contact_list(
+        self, current: FieldValue, ranked_new: list[str], limit: int,
+        sources: dict[str, str], evidence: str,
+    ) -> FieldValue:
+        separator = self._settings.contact_list_separator
+        existing = [part.strip() for part in (current.value or "").split(separator) if part.strip()]
+        merged = list(existing)
+        for value in ranked_new:
+            if len(merged) >= limit:
+                break
+            if not any(value.lower() == present.lower() for present in merged):
+                merged.append(value)
+
+        if merged == existing:
+            return current
+        first_added = next(value for value in merged if value not in existing)
+        return FieldValue(
+            value=separator.join(merged),
+            source_url=current.source_url or sources.get(first_added.lower()) or sources.get(first_added),
+            source_type=current.source_type or SourceType.REGEX,
+            evidence=current.evidence or evidence,
+            confidence=max(current.confidence, 0.6),
+        )
 
     def _apply_description(self, org: Organization, meta_description: str, text: str, url: str) -> None:
         candidate_text = meta_description or text.strip()

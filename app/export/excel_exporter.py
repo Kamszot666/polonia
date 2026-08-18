@@ -20,6 +20,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from app.export.excel_formatter import format_workbook
 from app.logging.logger import logger
 from app.models.schemas import FieldValue, Organization
 from config import Settings, settings
@@ -50,7 +51,18 @@ def export_to_excel(organizations: list[Organization], settings: Settings = sett
     settings.output_xlsx_path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(settings.output_xlsx_path)
     logger.info(f"Zapisano {len(organizations)} rekordów do {settings.output_xlsx_path}")
-    return settings.output_xlsx_path
+
+    if not settings.format_output_workbook:
+        return settings.output_xlsx_path
+
+    formatted_path = settings.output_xlsx_path.with_name(
+        f"{settings.output_xlsx_path.stem}{settings.formatted_output_suffix}"
+        f"{settings.output_xlsx_path.suffix}"
+    )
+    report = format_workbook(settings.output_xlsx_path, formatted_path, settings)
+    for label, value in report.as_lines():
+        logger.info(f"  {label}: {value}")
+    return formatted_path
 
 
 def _organization_to_row(lp: int, org: Organization) -> list[str]:
@@ -60,7 +72,10 @@ def _organization_to_row(lp: int, org: Organization) -> list[str]:
         lp,
         org.category or _BRAK,
         _value_or(org.industry, _BRAK),
-        _value_or(org.name, _BRAK),
+        # Nazwa z KRS/schema.org bywa nieustalona, ale nazwa wejściowa jest zawsze - bez tego
+        # fallbacku rekord trafiał do arkusza bez nazwy i przepadał przy czyszczeniu, mimo że
+        # miał komplet danych kontaktowych.
+        _value_or(org.name, org.input_name or _BRAK),
         _value_or(org.address, _BRAK),
         _value_or(org.voivodeship, _BRAK),
         _value_or(org.phone, _BRAK),

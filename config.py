@@ -19,7 +19,7 @@ class Settings:
         "+https://github.com/kamszot666/polonia)"
     )
     request_timeout_seconds: float = 15.0
-    max_concurrency: int = 8
+    max_concurrency: int = 12
     max_retries: int = 3
     backoff_base_seconds: float = 1.5
     # Podstrony jednego serwisu pobierane równolegle (zamiast jedna po drugiej) - i tak
@@ -83,6 +83,14 @@ class Settings:
     # Checkpoint / storage
     checkpoint_db_path: Path = Path("data/checkpoint.sqlite3")
     output_xlsx_path: Path = Path("data/output/polonia_organizacje.xlsx")
+    # Wytyczne obróbki arkuszy: wynik zapisywany jako NOWY plik, oryginał zostaje nietknięty.
+    format_output_workbook: bool = True
+    formatted_output_suffix: str = "_sformatowany"
+    missing_value_placeholder: str = "nie znaleziono"
+    # Wytyczne każą usuwać rekordy z samą nazwą i bez żadnych danych. Nazwy usuniętych trafiają
+    # do arkusza "Raport zmian", a pełny wynik zostaje w niesformatowanym pliku - ale jeśli
+    # nieudane podmioty mają zostać widoczne do ręcznego uzupełnienia, wystarczy to wyłączyć.
+    drop_records_without_data: bool = True
 
     # Walidacja
     verify_mx_records: bool = True
@@ -128,6 +136,19 @@ class Settings:
     enrich_short_descriptions: bool = True
     description_enrich_min_length: int = 200
     description_max_length: int = 600
+
+    # Wiele kontaktów w jednej rubryce. Strona kontaktowa podaje zwykle kilka adresów i numerów
+    # (sekretariat, biuro, dział projektów) - zostawiamy najwartościowsze, resztę pomijamy.
+    # Kolejność wartościowania e-maili siedzi w email_extractor._PRIORITY_LOCAL_PARTS, telefonów -
+    # w częstości występowania (numer centrali powtarza się na stronie najczęściej).
+    collect_additional_contacts: bool = True
+    max_emails_per_organization: int = 3
+    max_phones_per_organization: int = 3
+    contact_list_separator: str = ", "
+
+    # Profile w mediach społecznościowych wyłuskiwane z linków na stronie, gdy schema.org
+    # sameAs nie istnieje (a nie ma go większość stron organizacji polonijnych).
+    collect_social_media_links: bool = True
 
     # OCR
     ocr_languages: tuple[str, ...] = ("pl", "en")

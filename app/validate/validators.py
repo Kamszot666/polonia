@@ -29,19 +29,38 @@ def has_mx_record(domain: str, settings: Settings = settings) -> bool:
 
 
 def validate_email_field(field: FieldValue, settings: Settings = settings) -> FieldValue:
+    """Rubryka e-mail może zawierać kilka adresów rozdzielonych separatorem - każdy jest
+    sprawdzany osobno, a niepoprawne wypadają, zamiast unieważniać całą wartość."""
     if field.is_empty:
         return field
-    try:
-        result = validate_email(field.value, check_deliverability=False)
-    except EmailNotValidError as exc:
-        logger.warning(f"Niepoprawny e-mail odrzucony: {field.value!r} ({exc})")
-        return FieldValue()
 
-    if settings.verify_mx_records and not has_mx_record(result.domain, settings):
+    separator = settings.contact_list_separator
+    normalized: list[str] = []
+    without_mx = False
+    for candidate in (part.strip() for part in field.value.split(separator.strip() or ",")):
+        if not candidate:
+            continue
+        try:
+            result = validate_email(candidate, check_deliverability=False)
+        except EmailNotValidError as exc:
+            logger.warning(f"Niepoprawny e-mail odrzucony: {candidate!r} ({exc})")
+            continue
+        # Porównanie bez względu na wielkość liter: email_validator normalizuje tylko domenę
+        # (część lokalna formalnie bywa wrażliwa na wielkość), ale żaden realny dostawca poczty
+        # nie rozróżnia "Biuro@" od "biuro@", a w arkuszu to byłby duplikat.
+        if any(result.normalized.lower() == present.lower() for present in normalized):
+            continue
+        if settings.verify_mx_records and not has_mx_record(result.domain, settings):
+            without_mx = True
+        normalized.append(result.normalized)
+
+    if not normalized:
+        return FieldValue()
+    if without_mx:
         logger.warning(f"Domena bez rekordu MX, obniżam pewność: {field.value!r}")
         field.confidence = min(field.confidence, 0.3)
 
-    field.value = result.normalized
+    field.value = separator.join(normalized)
     return field
 
 
