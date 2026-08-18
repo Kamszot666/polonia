@@ -25,7 +25,8 @@ def test_parse_odpis_with_industry_data():
     assert record.nip.value == "5262149912"
     assert "JAZDÓW 10A" in record.address.value
     assert record.voivodeship.value == "mazowieckie"
-    assert record.industry.value == "WYDAWANIE KSIĄŻEK"
+    # API KRS podaje przedmiot działalności wersalikami - w arkuszu ma być czytelnie.
+    assert record.industry.value == "Wydawanie książek"
     assert record.nip.source_url == "https://api-krs.ms.gov.pl/test"
     assert record.nip.confidence == 0.95
 

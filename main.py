@@ -20,6 +20,7 @@ from app.extract.contact_relation_extractor import (
     get_person_name_detector,
     select_best_candidate,
 )
+from app.extract.address_extractor import find_address
 from app.extract.email_extractor import (
     find_emails,
     find_emails_in_html,
@@ -29,6 +30,8 @@ from app.extract.email_extractor import (
 )
 from app.extract.krs_registry import fetch_krs_record
 from app.extract.phone_extractor import count_phone_occurrences
+from app.extract.profile_classifier import detect_category, detect_organization_type
+from app.extract.registry_extractor import find_krs_numbers, find_nip_numbers, find_regon_numbers
 from app.extract.schema_extractor import extract_schema_data
 from app.extract.social_media_extractor import find_social_media_links, platform_of
 from app.extract.voivodeship_extractor import detect_voivodeship
@@ -52,6 +55,10 @@ def _needs_web_crawl(org: Organization, settings: Settings = settings) -> bool:
     fields = [org.email, org.phone, org.social_media, org.description]
     if settings.automatic_contact_person_enabled:
         fields += [org.contact_person.name, org.contact_person.email, org.contact_person.phone]
+    if settings.collect_registry_numbers:
+        fields += [org.krs, org.regon, org.nip]
+    if settings.collect_address_from_page:
+        fields += [org.address, org.voivodeship]
     if any(field.is_empty for field in fields):
         return True
     if settings.enrich_short_descriptions and len(org.description.value) < settings.description_enrich_min_length:
@@ -73,6 +80,26 @@ class _CrawlFindings:
     phone_sources: dict[str, str] = field(default_factory=dict)
     social_links: list[str] = field(default_factory=list)
     social_source_url: str | None = None
+    krs_counts: Counter[str] = field(default_factory=Counter)
+    nip_counts: Counter[str] = field(default_factory=Counter)
+    regon_counts: Counter[str] = field(default_factory=Counter)
+    registry_source_url: str | None = None
+    address: str | None = None
+    address_source_url: str | None = None
+
+    def add_registry_numbers(self, krs: list[str], nip: list[str], regon: list[str], url: str) -> None:
+        # Strony wymieniają czasem numery partnerów i sponsorów obok własnych, więc zliczamy
+        # wystąpienia i dopiero na końcu bierzemy ten powtarzający się najczęściej.
+        self.krs_counts.update(krs)
+        self.nip_counts.update(nip)
+        self.regon_counts.update(regon)
+        if (krs or nip or regon) and self.registry_source_url is None:
+            self.registry_source_url = url
+
+    def add_address(self, address: str | None, url: str) -> None:
+        if address and self.address is None:
+            self.address = address
+            self.address_source_url = url
 
     def add_emails(self, emails: list[str], url: str) -> None:
         for email in emails:
@@ -144,6 +171,9 @@ class OrganizationPipeline:
                 if not org.website.is_empty:
                     await self._crawl_site(org, org.website.value)
 
+            # Poza crawlem - branża i kategoria dają się ustalić z samej nazwy, więc uzupełniamy
+            # je także dla podmiotów, dla których nie było czego szukać na stronie.
+            self._apply_profile_classification(org)
             org = validate_organization(org, self._settings)
         except Exception as exc:
             logger.exception(f"Błąd przetwarzania {org.input_name!r}")
@@ -183,8 +213,63 @@ class OrganizationPipeline:
             all_candidates.extend(await self._analyze_page(org, parser, html, url, findings))
 
         self._apply_collected_contacts(org, findings)
+        self._apply_registry_numbers(org, findings)
+        self._apply_address(org, findings)
+        # Numer KRS wyłuskany ze strony otwiera drogę do API KRS, a stamtąd biorą się adres,
+        # województwo, NIP i przeważający przedmiot działalności - rubryki, których na stronie
+        # zwykle nie ma wcale.
+        if self._settings.krs_lookup_after_crawl and _needs_krs_lookup(org):
+            await self._apply_krs_registry(org)
         if self._settings.automatic_contact_person_enabled:
             self._apply_contact_person(org, all_candidates)
+
+    def _apply_registry_numbers(self, org: Organization, findings: _CrawlFindings) -> None:
+        if not self._settings.collect_registry_numbers:
+            return
+        for field_name, counts, confidence in (
+            ("krs", findings.krs_counts, 0.75),
+            # NIP i REGON mają sumy kontrolne zweryfikowane przy wykrywaniu, więc pewność jest
+            # wyższa niż dla KRS, gdzie potwierdza je dopiero odpowiedź z API.
+            ("nip", findings.nip_counts, 0.85),
+            ("regon", findings.regon_counts, 0.85),
+        ):
+            current = getattr(org, field_name)
+            if not current.is_empty or not counts:
+                continue
+            value, _ = counts.most_common(1)[0]
+            setattr(org, field_name, FieldValue(
+                value=value, source_url=findings.registry_source_url, source_type=SourceType.REGEX,
+                evidence=f"{field_name.upper()} w treści strony", confidence=confidence,
+            ))
+
+    def _apply_address(self, org: Organization, findings: _CrawlFindings) -> None:
+        if org.address.is_empty and findings.address:
+            org.address = FieldValue(
+                value=findings.address, source_url=findings.address_source_url,
+                source_type=SourceType.PAGE_TEXT, evidence="adres w treści strony", confidence=0.6,
+            )
+        if org.voivodeship.is_empty and not org.address.is_empty:
+            voivodeship = detect_voivodeship(org.address.value)
+            if voivodeship:
+                org.voivodeship = FieldValue(
+                    value=voivodeship, source_url=org.address.source_url,
+                    source_type=SourceType.PAGE_TEXT, evidence=org.address.value, confidence=0.6,
+                )
+
+    def _apply_profile_classification(self, org: Organization) -> None:
+        """Uzupełnia „Branża / Typ" i „Kategoria" na podstawie nazwy i opisu, gdy nie dostarczył
+        ich ani plik wejściowy, ani API KRS."""
+        name = org.name.value or org.input_name
+        if self._settings.detect_organization_type and org.industry.is_empty:
+            organization_type = detect_organization_type(name, self._settings)
+            if organization_type:
+                org.industry = FieldValue(
+                    value=organization_type, source_url=org.website.value or None,
+                    source_type=SourceType.PAGE_TEXT, evidence=f"forma prawna z nazwy: {name}",
+                    confidence=0.7,
+                )
+        if self._settings.detect_category and not org.category:
+            org.category = detect_category(name, org.description.value or "", self._settings)
 
     async def _fetch_subpages(self, urls: list[str]) -> list[tuple[str, str]]:
         """Pobiera podstrony jednego serwisu równolegle - wcześniej każda czekała na zakończenie
@@ -292,6 +377,13 @@ class OrganizationPipeline:
         findings.add_phones(phone_counts, url)
         if self._settings.collect_social_media_links:
             findings.add_social_links(find_social_media_links(html, url), url)
+        if self._settings.collect_registry_numbers:
+            findings.add_registry_numbers(
+                find_krs_numbers(combined_text), find_nip_numbers(combined_text),
+                find_regon_numbers(combined_text), url,
+            )
+        if self._settings.collect_address_from_page and org.address.is_empty:
+            findings.add_address(find_address(combined_text), url)
 
         if org.email.is_empty and email_candidates:
             best_email = max(email_candidates, key=score_email)
@@ -301,12 +393,15 @@ class OrganizationPipeline:
             main_phone, _ = phone_counts.most_common(1)[0]
             org.phone = FieldValue(value=main_phone, source_url=url, source_type=SourceType.REGEX,
                                     evidence=combined_text[:200], confidence=0.6)
-        if org.voivodeship.is_empty:
-            voivodeship = detect_voivodeship(org.address.value or combined_text)
+        if org.voivodeship.is_empty and not org.address.is_empty:
+            # Wyłącznie z adresu. Szukanie województwa w całym tekście strony dawało wyniki
+            # wprost błędne: Stowarzyszenie "Wspólnota Polska" z Krakowskiego Przedmieścia
+            # w Warszawie dostawało "śląskie" od wzmianki w artykule na stronie.
+            voivodeship = detect_voivodeship(org.address.value)
             if voivodeship:
                 org.voivodeship = FieldValue(value=voivodeship, source_url=url,
-                                              source_type=SourceType.PAGE_TEXT, evidence=combined_text[:200],
-                                              confidence=0.5)
+                                              source_type=SourceType.PAGE_TEXT,
+                                              evidence=org.address.value, confidence=0.6)
         self._apply_description(org, meta_description, text, url)
 
     def _apply_collected_contacts(self, org: Organization, findings: _CrawlFindings) -> None:
