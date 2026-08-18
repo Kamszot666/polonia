@@ -1,6 +1,9 @@
+from dataclasses import replace
+
 from app.models.schemas import FieldValue, OrganizationStatus, SourceType
 from app.models.schemas import Organization
 from app.validate.validators import validate_email_field, validate_organization, validate_url_field
+from config import settings
 
 
 def test_validate_email_field_rejects_malformed_address():
@@ -12,6 +15,19 @@ def test_validate_email_field_rejects_malformed_address():
 def test_validate_email_field_passes_through_empty():
     field = FieldValue(value=None)
     assert validate_email_field(field) is field
+
+
+def test_validate_email_field_validates_each_address_of_a_list():
+    """Rubryka może zawierać kilka adresów - jeden błędny nie może unieważnić pozostałych."""
+    field = FieldValue(value="biuro@example.pl, zly@@adres, sekretariat@example.pl", confidence=0.8)
+    result = validate_email_field(field, replace(settings, verify_mx_records=False))
+    assert result.value == "biuro@example.pl, sekretariat@example.pl"
+
+
+def test_validate_email_field_deduplicates_addresses():
+    field = FieldValue(value="biuro@example.pl, Biuro@Example.pl", confidence=0.8)
+    result = validate_email_field(field, replace(settings, verify_mx_records=False))
+    assert result.value == "biuro@example.pl"
 
 
 def test_validate_url_field_adds_scheme():

@@ -9,6 +9,7 @@ przez `config.settings.ner_enabled` po zainstalowaniu modeli. Podobnie `Semantic
 
 from __future__ import annotations
 
+import threading
 from typing import Protocol
 
 import regex as re
@@ -93,50 +94,88 @@ class HeuristicPersonNameDetector:
 
 class NerPersonNameDetector:
     """spaCy (NER) + GLiNER (zero-shot) - punkt integracji NLP. Wymaga config.ner_enabled=True
-    oraz pobranych modeli (config.spacy_model_name, config.gliner_model_name)."""
+    oraz pobranych modeli (config.spacy_model_name, config.gliner_model_name).
+
+    Modele ładowane są leniwie i trzymane przez cały czas życia instancji, dlatego instancję
+    należy tworzyć RAZ na proces (zob. get_person_name_detector) - `spacy.load` i
+    `GLiNER.from_pretrained` to każdorazowo sekundy i setki MB, więc tworzenie detektora dla
+    każdej strony osobno kosztowało wielokrotnie więcej niż samo pobieranie stron.
+
+    `detect` bywa wołane z wątku roboczego (asyncio.to_thread), a modele nie gwarantują
+    bezpieczeństwa wielowątkowego - stąd lock wokół inferencji. Nie spowalnia to niczego, bo
+    obliczenia i tak są ograniczone GIL-em; chodzi o to, by nie blokowały pętli zdarzeń."""
 
     _SPACY_PERSON_LABELS = {"persName", "PER", "PERSON"}
+    _GLINER_LABELS = ["osoba kontaktowa", "członek zarządu", "koordynator"]
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._spacy_nlp = None
         self._gliner_model = None
+        self._lock = threading.Lock()
+        self._cache: dict[tuple[str, str | None], list[str]] = {}
 
     def _ensure_models_loaded(self) -> None:
         if self._spacy_nlp is None:
             import spacy
 
+            logger.info(f"Ładuję model spaCy {self._settings.spacy_model_name!r} (raz na proces)")
             self._spacy_nlp = spacy.load(self._settings.spacy_model_name)
         if self._gliner_model is None:
             from gliner import GLiNER
 
+            logger.info(f"Ładuję model GLiNER {self._settings.gliner_model_name!r} (raz na proces)")
             self._gliner_model = GLiNER.from_pretrained(self._settings.gliner_model_name)
 
     def detect(self, text: str, organization_name: str | None = None) -> list[str]:
-        self._ensure_models_loaded()
-        excluded_tokens = HeuristicPersonNameDetector._organization_tokens(organization_name)
-        found: dict[str, None] = {}
+        # Bloki DOM są zagnieżdżone (div zawiera te same akapity co jego dzieci), więc ten sam
+        # tekst trafia tu wielokrotnie w obrębie jednej strony - cache oszczędza powtórną inferencję.
+        text = text[: self._settings.ner_max_text_chars]
+        cache_key = (text, organization_name)
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
 
-        for ent in self._spacy_nlp(text).ents:
-            if ent.label_ in self._SPACY_PERSON_LABELS:
-                candidate = ent.text.strip()
+        with self._lock:
+            self._ensure_models_loaded()
+            excluded_tokens = HeuristicPersonNameDetector._organization_tokens(organization_name)
+            found: dict[str, None] = {}
+
+            for ent in self._spacy_nlp(text).ents:
+                if ent.label_ in self._SPACY_PERSON_LABELS:
+                    candidate = ent.text.strip()
+                    if not any(token.lower() in excluded_tokens for token in candidate.split()):
+                        found[candidate] = None
+
+            for entity in self._gliner_model.predict_entities(text, labels=self._GLINER_LABELS):
+                candidate = entity["text"].strip()
                 if not any(token.lower() in excluded_tokens for token in candidate.split()):
                     found[candidate] = None
 
-        for entity in self._gliner_model.predict_entities(
-            text, labels=["osoba kontaktowa", "członek zarządu", "koordynator"]
-        ):
-            candidate = entity["text"].strip()
-            if not any(token.lower() in excluded_tokens for token in candidate.split()):
-                found[candidate] = None
+        names = list(found)
+        if len(self._cache) >= self._settings.ner_cache_size:
+            self._cache.clear()
+        self._cache[cache_key] = names
+        return list(names)
 
-        return list(found)
+
+_detector_lock = threading.Lock()
+_shared_detectors: dict[Settings, PersonNameDetector] = {}
 
 
 def get_person_name_detector(settings: Settings = settings) -> PersonNameDetector:
-    if settings.ner_enabled:
-        return NerPersonNameDetector(settings)
-    return HeuristicPersonNameDetector()
+    """Zwraca detektor współdzielony w obrębie procesu (Settings jest frozen, więc hashowalny).
+
+    Modele NER kosztują sekundy przy ładowaniu, a wcześniej powstawał nowy detektor przy każdym
+    wywołaniu extract_contact_candidates, czyli dla każdej podstrony każdej organizacji."""
+    if not settings.ner_enabled:
+        return HeuristicPersonNameDetector()
+    with _detector_lock:
+        detector = _shared_detectors.get(settings)
+        if detector is None:
+            detector = NerPersonNameDetector(settings)
+            _shared_detectors[settings] = detector
+        return detector
 
 
 class SemanticIntentScorer:
@@ -174,11 +213,24 @@ def extract_contact_candidates(
 ) -> list[ContactCandidate]:
     detector = person_detector or get_person_name_detector(settings)
     candidates: list[ContactCandidate] = []
+    seen_texts: set[str] = set()
 
     for block in blocks:
         text = block.text
+        # Selektory bloków są zagnieżdżone (section > div > p), więc ten sam tekst wraca tu po
+        # kilka razy i generowałby identyczne kandydatury - liczy się raz.
+        if text in seen_texts:
+            continue
+        seen_texts.add(text)
+
         emails = list(dict.fromkeys(find_emails(text) + find_emails_in_html(block.html)))
         phones = find_phones(text)
+        if settings.ner_require_contact_signal and not (emails or phones):
+            # Bez e-maila i telefonu maksymalna możliwa pewność kandydata to 0.25 (osoba) +
+            # 0.15 (stanowisko) = 0.40, czyli poniżej contact_person_confidence_threshold -
+            # taki blok nie zmieni wyniku, a rozpoznawanie osób jest tu najdroższą operacją.
+            continue
+
         persons = detector.detect(text, organization_name)
         position, position_ratio = _best_position_match(text)
 

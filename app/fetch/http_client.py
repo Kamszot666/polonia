@@ -14,6 +14,13 @@ from config import Settings, settings
 # Sygnały wskazujące, że strona jest renderowana przez JavaScript i httpx nie wystarczy.
 _JS_APP_ROOT_MARKERS = ('id="root"', 'id="app"', 'id="__next"', "ng-version=")
 
+# Błędy sieciowe, których ponawianie nie ma sensu - adres nie istnieje albo jest niepoprawny.
+_PERMANENT_NETWORK_ERRORS = (httpx.ConnectError, httpx.UnsupportedProtocol, httpx.InvalidURL)
+
+
+def _failure_key(url: str) -> str:
+    return f"__failed__{url}"
+
 
 @dataclass(slots=True)
 class FetchResult:
@@ -22,6 +29,9 @@ class FetchResult:
     status_code: int | None
     from_cache: bool
     error: str | None = None
+    # Niepowodzenie, którego przeglądarka też nie naprawi (nie-HTML content-type, 404/410,
+    # nieistniejąca domena) - nie ma sensu uruchamiać dla niego Playwrighta.
+    permanent_failure: bool = False
 
     @property
     def ok(self) -> bool:
@@ -29,6 +39,10 @@ class FetchResult:
 
 
 def needs_browser_rendering(result: FetchResult, settings: Settings = settings) -> bool:
+    if result.permanent_failure:
+        # Playwright na pliku PDF, stronie 404 czy martwej domenie to kilkanaście sekund
+        # zmarnowane na pewny brak wyniku.
+        return False
     if not result.ok:
         return True
     html = result.html or ""
@@ -54,17 +68,27 @@ class HttpFetcher:
         cached_html = self._cache.get(url)
         if cached_html is not None:
             return FetchResult(url=url, html=cached_html, status_code=200, from_cache=True)
+        cached_error = self._cache.get(_failure_key(url))
+        if cached_error is not None:
+            # Bez tego każdy kolejny przebieg powtarzał pełną serię prób z backoffem dla tych
+            # samych martwych adresów - przy setkach podmiotów to kilkanaście minut na nic.
+            return FetchResult(url=url, html=None, status_code=None, from_cache=True,
+                                error=cached_error, permanent_failure=True)
 
         async with self._semaphore:
             result = await self._fetch_with_retry(url)
 
         if result.ok:
             self._cache.set(url, result.html, expire=self._settings.cache_expire_seconds)
+        elif result.permanent_failure:
+            self._cache.set(_failure_key(url), result.error or "brak treści HTML",
+                             expire=self._settings.failed_fetch_cache_seconds)
         return result
 
     async def _fetch_with_retry(self, url: str) -> FetchResult:
         delay = self._settings.backoff_base_seconds
         last_error: str | None = None
+        permanent = False
         for attempt in range(1, self._settings.max_retries + 1):
             try:
                 response = await self._client.get(url)
@@ -76,20 +100,30 @@ class HttpFetcher:
                     # treść jako HTML (UnicodeDecodeError). Traktujemy to jak brak treści HTML.
                     logger.debug(f"Pomijam nie-HTML odpowiedź dla {url}: content-type={content_type}")
                     return FetchResult(url=url, html=None, status_code=response.status_code, from_cache=False,
-                                        error=f"nie-HTML content-type: {content_type}")
+                                        error=f"nie-HTML content-type: {content_type}", permanent_failure=True)
                 return FetchResult(url=url, html=response.text, status_code=response.status_code, from_cache=False)
             except httpx.HTTPStatusError as exc:
                 last_error = f"HTTP {exc.response.status_code}"
                 logger.warning(f"Próba {attempt}/{self._settings.max_retries} nieudana dla {url}: {last_error}")
                 if exc.response.status_code in (404, 410):
+                    permanent = True
                     break
+            except _PERMANENT_NETWORK_ERRORS as exc:
+                # Nieistniejąca domena, odmowa połączenia albo niepoprawny adres nie zaczną
+                # działać po 1,5 s przerwy - ponawianie ich to czysta strata czasu, a w bazie
+                # organizacji polonijnych sporo adresów WWW jest już nieaktywnych.
+                last_error = str(exc)
+                permanent = True
+                logger.warning(f"Adres nieosiągalny, nie ponawiam {url}: {last_error}")
+                break
             except httpx.HTTPError as exc:
                 last_error = str(exc)
                 logger.warning(f"Próba {attempt}/{self._settings.max_retries} nieudana dla {url}: {last_error}")
             if attempt < self._settings.max_retries:
                 await asyncio.sleep(delay)
                 delay *= 2
-        return FetchResult(url=url, html=None, status_code=None, from_cache=False, error=last_error)
+        return FetchResult(url=url, html=None, status_code=None, from_cache=False, error=last_error,
+                            permanent_failure=permanent)
 
     async def aclose(self) -> None:
         await self._client.aclose()
