@@ -37,8 +37,14 @@ class BrowserFetcher:
         page = await self._browser.new_page(user_agent=self._settings.user_agent)
         try:
             response = await page.goto(
-                url, timeout=self._settings.playwright_timeout_ms, wait_until="networkidle",
+                url, timeout=self._settings.playwright_timeout_ms,
+                wait_until=self._settings.browser_wait_until,
             )
+            # Krótkie dociążenie zamiast czekania na "networkidle" - strony z analityką, czatem
+            # czy reklamami nigdy nie wyciszają ruchu sieciowego i wcześniej czekały do końca
+            # timeoutu (20 s) mimo że treść była gotowa po ułamku sekundy.
+            if self._settings.browser_settle_ms:
+                await page.wait_for_timeout(self._settings.browser_settle_ms)
             html = await page.content()
             status_code = response.status if response else None
             return FetchResult(url=url, html=html, status_code=status_code, from_cache=False)

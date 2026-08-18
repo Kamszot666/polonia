@@ -15,6 +15,7 @@ from app.extract.contact_relation_extractor import (
     ContactCandidate,
     extract_contact_candidates,
     find_candidate_matching_name,
+    get_person_name_detector,
     select_best_candidate,
 )
 from app.extract.email_extractor import find_emails, find_emails_in_html, score_email
@@ -73,6 +74,9 @@ class OrganizationPipeline:
         self._browser = browser_fetcher
         self._searcher = searcher
         self._krs_client = krs_client
+        # Jeden detektor (a więc jedno załadowanie spaCy i GLiNER) na cały przebieg zamiast
+        # nowego dla każdej pobranej strony. Modele wczytują się leniwie, przy pierwszym użyciu.
+        self._person_detector = get_person_name_detector(settings)
 
     async def process(self, org: Organization) -> Organization:
         org.status = OrganizationStatus.IN_PROGRESS
@@ -115,37 +119,60 @@ class OrganizationPipeline:
             org.industry = record.industry
 
     async def _crawl_site(self, org: Organization, start_url: str) -> None:
-        to_visit = [start_url]
-        visited: set[str] = set()
-        all_candidates: list[ContactCandidate] = []
+        start_html = await self._fetch_page(start_url)
+        if start_html is None:
+            return
 
-        while to_visit and len(visited) <= self._settings.max_subpages_per_site:
-            url = to_visit.pop(0)
-            if url in visited:
-                continue
-            visited.add(url)
+        start_parser = PageParser(start_html, start_url, self._settings)
+        self._apply_schema_data(org, start_html, start_url)
+        subpage_urls = [url for url in start_parser.find_subpage_links() if url != start_url]
 
-            html = await self._fetch_page(url)
-            if html is None:
-                continue
-
+        all_candidates = await self._analyze_page(org, start_parser, start_html, start_url)
+        for url, html in await self._fetch_subpages(subpage_urls):
             parser = PageParser(html, url, self._settings)
-
-            if url == start_url:
-                self._apply_schema_data(org, html, url)
-                to_visit.extend(link for link in parser.find_subpage_links() if link not in visited)
-
-            self._apply_text_fields(org, parser, html, url)
-            if self._settings.automatic_contact_person_enabled:
-                organization_name = org.name.value or org.input_name
-                all_candidates.extend(
-                    extract_contact_candidates(
-                        parser.dom_blocks(), url, self._settings, organization_name=organization_name,
-                    )
-                )
+            all_candidates.extend(await self._analyze_page(org, parser, html, url))
 
         if self._settings.automatic_contact_person_enabled:
             self._apply_contact_person(org, all_candidates)
+
+    async def _fetch_subpages(self, urls: list[str]) -> list[tuple[str, str]]:
+        """Pobiera podstrony jednego serwisu równolegle - wcześniej każda czekała na zakończenie
+        poprzedniej, więc na jeden podmiot przypadało do dziewięciu pełnych czasów odpowiedzi
+        pod rząd. Globalny limit równoległości pilnuje semafor w HttpFetcher."""
+        if not urls:
+            return []
+        if self._settings.parallel_subpage_fetch:
+            results = await asyncio.gather(
+                *(self._fetch_page(url) for url in urls), return_exceptions=True
+            )
+        else:
+            results = [await self._fetch_page(url) for url in urls]
+
+        fetched: list[tuple[str, str]] = []
+        for url, result in zip(urls, results):
+            if isinstance(result, BaseException):
+                logger.warning(f"Nie udało się pobrać podstrony {url}: {result}")
+            elif result is not None:
+                fetched.append((url, result))
+        return fetched
+
+    async def _analyze_page(
+        self, org: Organization, parser: PageParser, html: str, url: str
+    ) -> list[ContactCandidate]:
+        self._apply_text_fields(org, parser, html, url)
+        if not self._settings.automatic_contact_person_enabled:
+            return []
+        organization_name = org.name.value or org.input_name
+        # Rozpoznawanie osób (spaCy + GLiNER) to czysty CPU i potrafi zająć sekundy - w pętli
+        # zdarzeń zatrzymywałoby pobieranie stron dla wszystkich pozostałych organizacji.
+        return await asyncio.to_thread(
+            extract_contact_candidates,
+            parser.dom_blocks(),
+            url,
+            self._settings,
+            person_detector=self._person_detector,
+            organization_name=organization_name,
+        )
 
     def _apply_contact_person(self, org: Organization, all_candidates: list[ContactCandidate]) -> None:
         known_name = org.contact_person.name
