@@ -13,19 +13,47 @@ _mx_cache: dict[str, bool] = {}
 
 
 def has_mx_record(domain: str, settings: Settings = settings) -> bool:
+    """Sprawdza, czy domena przyjmuje pocztę.
+
+    Rozróżnia dwa przypadki, które wcześniej dawały ten sam wynik: domenę bez rekordów MX
+    (odpowiedź rejestru - wynik wiążący) i brak odpowiedzi resolwera (problem sieci - wtedy
+    pytamy serwery zapasowe zamiast uznawać poprawny adres za podejrzany)."""
     if domain in _mx_cache:
         return _mx_cache[domain]
+
+    answer = _query_mx(domain, None, settings)
+    if answer is None:
+        for server in settings.dns_fallback_servers:
+            logger.debug(f"Resolwer systemowy nie odpowiedział dla {domain!r} - pytam {server}")
+            answer = _query_mx(domain, [server], settings)
+            if answer is not None:
+                break
+    if answer is None:
+        # Nawet serwery zapasowe milczą - to awaria sieci, nie wada adresu. Nie zapamiętujemy
+        # tego w cache, żeby chwilowy problem nie rzutował na resztę przebiegu.
+        logger.warning(f"Nie udało się sprawdzić rekordów MX dla {domain!r} - zakładam, że są")
+        return True
+
+    _mx_cache[domain] = answer
+    return answer
+
+
+def _query_mx(domain: str, nameservers: list[str] | None, settings: Settings) -> bool | None:
+    """True/False gdy odpowiedź jest wiążąca, None gdy resolwer nie odpowiedział."""
+    resolver = dns.resolver.Resolver()
+    resolver.timeout = settings.dns_resolver_timeout_seconds
+    resolver.lifetime = settings.dns_resolver_timeout_seconds
+    if nameservers is not None:
+        resolver.nameservers = nameservers
     try:
-        resolver = dns.resolver.Resolver()
-        resolver.timeout = settings.dns_resolver_timeout_seconds
-        resolver.lifetime = settings.dns_resolver_timeout_seconds
         resolver.resolve(domain, "MX")
-        result = True
-    except Exception as exc:
+        return True
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN) as exc:
         logger.debug(f"Brak rekordu MX dla domeny {domain!r}: {exc}")
-        result = False
-    _mx_cache[domain] = result
-    return result
+        return False
+    except Exception as exc:
+        logger.debug(f"Resolwer nie odpowiedział dla {domain!r}: {exc}")
+        return None
 
 
 def validate_email_field(field: FieldValue, settings: Settings = settings) -> FieldValue:
