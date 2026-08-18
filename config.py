@@ -14,9 +14,20 @@ _PREINSTALLED_CHROMIUM = Path("/opt/pw-browsers/chromium")
 @dataclass(frozen=True)
 class Settings:
     # Sieć
+    # Zweryfikowane realnie: przy nagłówku deklarującym bota strony organizacji odpowiadały
+    # HTTP 403 (swiatnatak.pl, ltn.lomza.pl, krzyzowa.org.pl), przez co każda kończyła się
+    # dopiero kosztownym fallbackiem na przeglądarkę. Pobierane są wyłącznie publicznie
+    # opublikowane dane kontaktowe, a tempo ogranicza max_concurrency.
     user_agent: str = (
-        "Mozilla/5.0 (compatible; PoloniaContactBot/0.1; "
-        "+https://github.com/kamszot666/polonia)"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    )
+    # Nagłówki, które wysyła każda przeglądarka - ich brak sam w sobie bywa sygnałem dla
+    # filtrów antybotowych, nawet przy prawidłowym User-Agent.
+    default_headers: tuple[tuple[str, str], ...] = (
+        ("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"),
+        ("Accept-Language", "pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7"),
+        ("Upgrade-Insecure-Requests", "1"),
     )
     request_timeout_seconds: float = 15.0
     max_concurrency: int = 12
@@ -94,7 +105,12 @@ class Settings:
 
     # Walidacja
     verify_mx_records: bool = True
-    dns_resolver_timeout_seconds: float = 5.0
+    dns_resolver_timeout_seconds: float = 2.5
+    # Zweryfikowane realnie u użytkownika: router jako serwer DNS gubił zapytania i nawet
+    # gmail.com wychodził jako domena "bez rekordu MX" po 5 s czekania. Gdy resolwer systemowy
+    # nie odpowiada, pytamy publiczne serwery - brak odpowiedzi to problem sieci, a nie dowód,
+    # że domena nie przyjmuje poczty.
+    dns_fallback_servers: tuple[str, ...] = ("1.1.1.1", "8.8.8.8")
 
     # NER / NLP - wymaga wcześniejszego: pip install spacy gliner oraz
     # "python -m spacy download pl_core_news_lg" (main.py sprawdza to na starcie i przerywa

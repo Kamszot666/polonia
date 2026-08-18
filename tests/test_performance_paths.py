@@ -9,7 +9,7 @@ Te testy pilnują, żeby żadna z tych ścieżek nie wróciła po zmianach.
 """
 
 from dataclasses import replace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -151,3 +151,29 @@ async def test_transient_failure_is_retried(fetcher):
     assert fetcher._client.get.await_count == settings_without_waiting.max_retries
     assert not result.permanent_failure
     await fetcher.aclose()
+
+
+async def test_forbidden_response_is_not_retried_but_still_reaches_browser(fetcher):
+    """Zweryfikowane realnie: swiatnatak.pl, ltn.lomza.pl i krzyzowa.org.pl odpowiadały 403.
+    Odmowa nie zmieni się po odczekaniu, ale przeglądarka bywa wpuszczana tam, gdzie httpx nie."""
+    response = MagicMock(status_code=403)
+    fetcher._client.get = AsyncMock(
+        side_effect=httpx.HTTPStatusError("403", request=MagicMock(), response=response)
+    )
+
+    result = await fetcher.fetch("https://example.pl/")
+
+    assert fetcher._client.get.await_count == 1
+    assert not result.permanent_failure          # fallback na przeglądarkę ma sens
+    assert needs_browser_rendering(result) is True
+    await fetcher.aclose()
+
+
+def test_requests_carry_browser_headers():
+    """Sam prawidłowy User-Agent nie wystarcza - brak typowych nagłówków przeglądarki
+    też bywa sygnałem dla filtrów antybotowych."""
+    headers = HttpFetcher(Settings())._client.headers
+
+    assert "Chrome" in headers["User-Agent"]
+    assert "text/html" in headers["Accept"]
+    assert headers["Accept-Language"].startswith("pl-PL")

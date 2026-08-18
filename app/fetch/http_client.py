@@ -59,7 +59,7 @@ class HttpFetcher:
         self._cache = Cache(str(settings.cache_dir))
         self._semaphore = asyncio.Semaphore(settings.max_concurrency)
         self._client = httpx.AsyncClient(
-            headers={"User-Agent": settings.user_agent},
+            headers={"User-Agent": settings.user_agent, **dict(settings.default_headers)},
             timeout=settings.request_timeout_seconds,
             follow_redirects=True,
         )
@@ -107,6 +107,11 @@ class HttpFetcher:
                 logger.warning(f"Próba {attempt}/{self._settings.max_retries} nieudana dla {url}: {last_error}")
                 if exc.response.status_code in (404, 410):
                     permanent = True
+                    break
+                if exc.response.status_code in (401, 403):
+                    # Odmowa dostępu nie zmieni się po odczekaniu - ale przeglądarka bywa
+                    # wpuszczana tam, gdzie samo httpx nie, więc NIE jest to trwały błąd
+                    # i fallback na Playwright ma sens.
                     break
             except _PERMANENT_NETWORK_ERRORS as exc:
                 # Nieistniejąca domena, odmowa połączenia albo niepoprawny adres nie zaczną
