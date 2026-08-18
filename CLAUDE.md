@@ -52,6 +52,12 @@ Moduły w `app/` odpowiadają kolejnym etapom:
 - `extract/social_media_extractor.py` — profile z linków na stronie, gdy schema.org `sameAs`
   nie istnieje. Odfiltrowuje przyciski „udostępnij" (`facebook.com/sharer`), zostawia jeden
   profil na serwis i tylko sześć dozwolonych serwisów.
+- `extract/registry_extractor.py` — KRS/NIP/REGON z treści strony (regex + sumy kontrolne).
+- `extract/address_extractor.py` — adres siedziby; kotwicą jest kod pocztowy, bo w polskich
+  adresach występuje praktycznie zawsze.
+- `extract/profile_classifier.py` — „Branża / Typ" z formy prawnej w nazwie i „Kategoria"
+  z obszaru działania. Słowniki obu leżą w `config.py`, żeby dało się je dopasować do
+  nazewnictwa konkretnej bazy bez ruszania kodu.
 - `checkpoint/checkpoint_store.py` — SQLite; przebieg można przerwać i wznowić, ukończone
   podmioty nie są przetwarzane ponownie.
 - `export/excel_exporter.py` — zapis do arkusza o ustalonym schemacie kolumn.
@@ -83,6 +89,17 @@ Rubryki telefonu, e-maila i mediów społecznościowych mieszczą po kilka warto
 - Kolejność telefonów bierze się z częstości występowania: numer centrali powtarza się
   na stronie najczęściej.
 - Wartość z pliku wejściowego zostaje pierwsza i nietknięta — nowe są dopisywane za nią.
+
+## Skąd biorą się pozostałe rubryki
+
+Kolejność ma znaczenie i jest zamierzona: strona → numer KRS → API KRS → adres, województwo,
+NIP, branża. Numer wyłuskany z treści strony otwiera drogę do rejestru, a stamtąd biorą się
+rubryki, których na stronie zwykle nie ma wcale — dlatego `_needs_krs_lookup` sprawdzany jest
+**po** crawlu, nie tylko przed nim.
+
+Województwo ustalane jest **wyłącznie z adresu**. Szukanie nazwy województwa w całym tekście
+strony dawało wyniki wprost błędne (Wspólnota Polska z Krakowskiego Przedmieścia w Warszawie
+dostawała „śląskie" od wzmianki w artykule).
 
 ## Rozpoznawanie osób
 

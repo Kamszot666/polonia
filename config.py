@@ -150,6 +150,57 @@ class Settings:
     # sameAs nie istnieje (a nie ma go większość stron organizacji polonijnych).
     collect_social_media_links: bool = True
 
+    # Uzupełnianie pozostałych rubryk z treści stron: numery rejestrowe, adres, branża, kategoria.
+    # KRS/NIP/REGON mają sumy kontrolne (poza KRS), więc trafienie przypadkowego ciągu cyfr jest
+    # mało prawdopodobne; brany jest numer powtarzający się najczęściej w obrębie witryny, bo
+    # strony wymieniają czasem numery partnerów i sponsorów.
+    collect_registry_numbers: bool = True
+    collect_address_from_page: bool = True
+    # Znaleziony na stronie numer KRS pozwala dociągnąć z API KRS adres, województwo, NIP
+    # i przeważający przedmiot działalności - czyli rubryki, których na stronie zwykle nie ma.
+    krs_lookup_after_crawl: bool = True
+
+    # "Branża / Typ" - forma prawna podmiotu, czytelna wprost z nazwy własnej.
+    detect_organization_type: bool = True
+    organization_type_keywords: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("Fundacja", ("fundacja", "fundacji")),
+        ("Stowarzyszenie", ("stowarzyszenie", "stowarzyszenia")),
+        ("Towarzystwo", ("towarzystwo", "towarzystwa")),
+        ("Związek", ("związek", "związku")),
+        ("Federacja", ("federacja", "federacji")),
+        ("Instytut", ("instytut", "instytutu")),
+        ("Muzeum", ("muzeum",)),
+        ("Szkoła", ("szkoła", "szkoły", "liceum", "przedszkole")),
+        ("Parafia", ("parafia", "parafii")),
+        ("Klub", ("klub", "klubu")),
+        ("Komitet", ("komitet", "komitetu")),
+        ("Rada", ("rada", "rady")),
+        ("Kongres", ("kongres", "kongresu")),
+        ("Zjednoczenie", ("zjednoczenie", "zjednoczenia")),
+    )
+
+    # "Kategoria" - obszar działania. Lista jest celowo krótka i łatwa do podmiany: jeśli baza
+    # używa innego nazewnictwa kategorii, wystarczy poprawić etykiety po lewej stronie.
+    # Kolejność ma znaczenie - wygrywa pierwsze dopasowanie, więc kategorie węższe idą wyżej.
+    detect_category: bool = True
+    organization_category_keywords: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("Kombatanci i weterani", ("kombatant", "weteran", "sybirak", "sybiracy", "żołnierz",
+                                     "armii krajowej", "powstań")),
+        ("Oświata i edukacja", ("szkoł", "oświat", "edukac", "nauczyc", "kształc", "stypend",
+                                  "uczni", "przedszkol", "podręcznik", "polonijnej szkoły")),
+        ("Kultura i dziedzictwo", ("kultur", "dziedzictw", "zabyt", "muzeal", "sztuk", "folklor",
+                                     "chór", "zespół pieśni", "teatr", "bibliotek", "archiw")),
+        ("Media", ("radio", "telewiz", "portal", "redakcj", "czasopism", "gazet", "wydawnicz",
+                    "kwartalnik", "miesięcznik")),
+        ("Nauka", ("nauk", "badaw", "badań", "uniwersyt", "akadem", "konferencj naukow")),
+        ("Religia", ("parafi", "kościel", "katolic", "duszpaster", "zakon", "misj")),
+        ("Sport i turystyka", ("sport", "turyst", "rajd", "olimp")),
+        ("Młodzież i dzieci", ("młodzież", "harcer", "studenc", "dzieci", "kolonie")),
+        ("Gospodarka i biznes", ("przedsiębiorc", "izba gospodarcza", "biznes", "gospodarcz")),
+        ("Pomoc charytatywna", ("pomoc", "charytat", "dobroczyn", "humanitar", "repatriac",
+                                  "wsparcie rodak", "paczk")),
+    )
+
     # OCR
     ocr_languages: tuple[str, ...] = ("pl", "en")
 

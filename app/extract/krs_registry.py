@@ -96,9 +96,15 @@ def _build_address(siedziba_i_adres: dict, source_url: str) -> FieldValue:
     return _field(text or None, source_url, "dzial1.siedzibaIAdres.adres", 0.9)
 
 
+def _normalize_case(text: str) -> str:
+    """API KRS podaje przedmiot działalności wersalikami ("WYDAWANIE KSIĄŻEK") - w arkuszu
+    wygląda to jak krzyk i psuje czytelność kolumny."""
+    return text.capitalize() if text.isupper() else text
+
+
 def _build_industry(dzial2: dict, source_url: str) -> FieldValue:
     przedmiot = dzial2.get("przedmiotDzialalnosci", {}).get("przedmiotPrzewazajacejDzialalnosci") or []
-    descriptions = [item["opis"] for item in przedmiot if item.get("opis")]
+    descriptions = [_normalize_case(item["opis"]) for item in przedmiot if item.get("opis")]
     if not descriptions:
         return FieldValue()
     return _field(
